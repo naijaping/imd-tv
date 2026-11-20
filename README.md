@@ -9,6 +9,8 @@ IMD TV Extra
 IMD TV Extra is a player for your own IPTV playlist (Xtream login, M3U link or Stalker portal). It has a fast TV guide that keeps up with
 the remote, movies and series with posters and subtitles, six themes, and no ads or tracking.
 
+This is a fork of the original IMD TV but with some goodies.
+
 Website: https://imd-tv.com
 
 >IMD TV Extra is a media player. It does not provide, sell or link to any channels or content — use the playlist you
