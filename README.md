@@ -1,6 +1,6 @@
 <p align="center"><img src="site/img/logo.png" alt="IMD TV" width="160"></p>
 
-# IMD TV - Extra
+#IMD TV Extra - Extra
 
 **Live TV, films and series on Android TV — free and open source.**
 
@@ -11,7 +11,7 @@ the remote, movies and series with posters and subtitles, six themes, and no ads
 
 Website: https://imd-tv.com
 
-> IMD TV is a media player. It does not provide, sell or link to any channels or content — use the playlist you
+>IMD TV Extra is a media player. It does not provide, sell or link to any channels or content — use the playlist you
 > already have from your provider.
 
 ## Features
@@ -66,14 +66,14 @@ Requires Android TV / Google TV **8.0 or newer** (tested on Chromecast with Goog
 
 1. On your TV, install the free **Downloader** app from the Play Store.
 2. Open Downloader, type the code `7573990` and press Go. When asked, allow Downloader to install apps, then choose Install.
-3. Open IMD TV and add your Xtream login, M3U link or Stalker portal.
+3. OpenIMD TV Extra and add your Xtream login, M3U link or Stalker portal.
 
 ### Option 2: Sideloading (from a computer)
 
 1. Download `imd-tv.apk` from [Releases](#releases) on your computer.
 2. On the TV, turn on Developer options and USB or network debugging, then run `adb connect <your TV's IP>` and
    `adb install imd-tv.apk`. Or copy the file to a USB drive and open it with a file manager app on the TV.
-3. Open IMD TV and add your Xtream login, M3U link or Stalker portal.
+3. OpenIMD TV Extra and add your Xtream login, M3U link or Stalker portal.
 
 ## Build from source
 
@@ -98,7 +98,7 @@ support@imd-tv.com
 
 ## Licence
 
-[GPL-3.0](LICENSE). You may use, study, change and share IMD TV; shared changes must stay under the same licence.
+[GPL-3.0](LICENSE). You may use, study, change and shareIMD TV Extra; shared changes must stay under the same licence.
 
 ## Releases
 
