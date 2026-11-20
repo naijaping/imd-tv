@@ -1,6 +1,6 @@
 <p align="center"><img src="site/img/logo.png" alt="IMD TV" width="160"></p>
 
-# IMD TV
+# IMD TV - Extra
 
 **Live TV, films and series on Android TV — free and open source.**
 
