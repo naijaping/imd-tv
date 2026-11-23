@@ -1,6 +1,8 @@
 package org.imdtv.iptvtv.ui.settings
 
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import org.imdtv.iptvtv.data.settings.HERO_SCALES
 import org.imdtv.iptvtv.ui.theme.LocalTheme
 import kotlinx.coroutines.delay
@@ -79,6 +81,8 @@ fun AppearanceAppRows(vm: SettingsViewModel, first: FocusRequester, openers: Map
 fun AppearanceLiveRows(vm: SettingsViewModel, first: FocusRequester) {
     val s by vm.settings.collectAsState()
     val f = Modifier.focusRequester(first)
+    // Scrolls: with the header sizes and Brand logo the page is taller than the screen, and focus only moves to rows it can show.
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
     if (s.glass()) {
         val rowChoices = guideRowChoices(s.headerSize, s.theme == ThemeId.LIQUID_GLASS)
         ChoiceRow(stringResource(R.string.set_a_guide_rows), stringResource(R.string.set_a_guide_rows_expl), rowChoices, s.guideRows, { "$it" }, f, default = rowChoices.first()) { n -> vm.update { it.copy(guideRows = n) } }
@@ -89,10 +93,11 @@ fun AppearanceLiveRows(vm: SettingsViewModel, first: FocusRequester) {
         HeroSizeRows(vm, s)
         BrandLogoRow(vm, s)
     }
-    SwitchRow(stringResource(R.string.set_a_live_indicator), stringResource(R.string.set_a_live_indicator_expl), s.showLiveIndicator) { on -> vm.update { it.copy(showLiveIndicator = on) } }
-    SwitchRow(stringResource(R.string.set_a_multi_line), stringResource(R.string.set_a_multi_line_expl), s.multiLineGuide, if (s.glass()) Modifier else f) { on -> vm.update { it.copy(multiLineGuide = on) } }
+    SwitchRow(stringResource(R.string.set_a_live_indicator), stringResource(R.string.set_a_live_indicator_expl), s.showLiveIndicator, if (s.glass()) Modifier else f) { on -> vm.update { it.copy(showLiveIndicator = on) } }
+    SwitchRow(stringResource(R.string.set_a_multi_line), stringResource(R.string.set_a_multi_line_expl), s.multiLineGuide) { on -> vm.update { it.copy(multiLineGuide = on) } }
     ChoiceRow(stringResource(R.string.set_a_title_size), stringResource(R.string.set_a_title_size_live_expl), TitleSize.entries, s.titleSize, { stringResource(it.labelRes) }, default = AppSettings().titleSize, onPick = { v -> vm.update { it.copy(titleSize = v) } })
     ChoiceRow(stringResource(R.string.set_a_epg_text_size), stringResource(R.string.set_a_epg_text_size_expl), org.imdtv.iptvtv.data.settings.EpgTextSize.entries, s.epgTextSize, { stringResource(it.labelRes) }, default = AppSettings().epgTextSize, onPick = { v -> vm.update { it.copy(epgTextSize = v) } })
+    }
 }
 
 /** Appearance › Movies & Series: rows and its own title size. */
