@@ -7,7 +7,8 @@ import org.imdtv.iptvtv.data.db.SQL_CHUNK
 import org.imdtv.iptvtv.data.epg.effectiveOffsetMinutes
 
 /** A programme on a channel's own clock (EPG offset already applied). */
-data class GuideProgramme(val title: String, val desc: String?, val episodeNum: String?, val start: Long, val stop: Long, val ageRating: Int? = null)
+data class GuideProgramme(val title: String, val desc: String?, val episodeNum: String?, val start: Long, val stop: Long, val ageRating: Int? = null,
+    /** The programme's image (XMLTV `<icon src>`; Xtream's xmltv.php carries it too); shown in the empty preview. */ val icon: String? = null)
 
 class GuideRepository(private val db: AppDatabase) {
     /** Programmes overlapping [from, to) per channel id, in start order. Unlinked channels are absent. */
@@ -26,7 +27,7 @@ class GuideRepository(private val db: AppDatabase) {
             .groupBy { it.epgChannelKey }
         return offsets.mapValues { (_, ko) ->
             val (key, off) = ko
-            byKey[key].orEmpty().map { GuideProgramme(it.title, it.desc, it.episodeNum, it.start + off, it.stop + off, it.ageRating) }
+            byKey[key].orEmpty().map { GuideProgramme(it.title, it.desc, it.episodeNum, it.start + off, it.stop + off, it.ageRating, it.icon?.takeIf { i -> i.isNotBlank() }) }
                 .filter { it.stop > from && it.start < to }
                 .sortedBy { it.start }
         }

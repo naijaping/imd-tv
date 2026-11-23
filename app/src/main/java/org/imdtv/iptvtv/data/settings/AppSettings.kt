@@ -185,6 +185,11 @@ data class AppSettings(
     val showLiveIndicator: Boolean = true,
     /** Celestial/Liquid Glass guide, top left: a copy of the chosen image in app storage (BrandLogo); null = the app's logo. Not backed up: per box. */
     val brandLogoPath: String? = null,
+    /** The address [brandLogoPath] was downloaded from (Logo image URL); null when it came from a file or is the default. */
+    val brandLogoUrl: String? = null,
+    /** Appearance › Live TV › Header channel logo / Header title size: multiplies the guide header's logo / title; one of [HERO_SCALES]. */
+    val heroLogoScale: Float = 1f,
+    val heroTitleScale: Float = 1f,
     /** Other themes' [look]s by theme name, so a glass theme's colour/header/rows don't carry to another theme. */
     val themeLooks: Map<String, String> = emptyMap(),
     /** Open-source guide files (URLs) turned off in EPG sources: kept in the list, never imported or matched. */
@@ -223,7 +228,7 @@ data class AppSettings(
         copy(theme = d.theme, themeColour = d.themeColour, themeDark = d.themeDark, guideRows = d.guideRows, headerSize = d.headerSize,
             previewFade = d.previewFade, themeLooks = emptyMap(), multiLineGuide = d.multiLineGuide, showDateTime = d.showDateTime,
             showDate = d.showDate, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
-            showLiveIndicator = d.showLiveIndicator)
+            showLiveIndicator = d.showLiveIndicator, heroLogoScale = d.heroLogoScale, heroTitleScale = d.heroTitleScale)
     }
 
     fun clamped() = copy(
@@ -234,8 +239,15 @@ data class AppSettings(
         startEarlyMin = startEarlyMin.takeIf { it in START_EARLY } ?: 2,
         endLateMin = endLateMin.takeIf { it in END_LATE } ?: 5,
         guideRows = guideRows.coerceIn(GUIDE_ROWS.first(), 15),
+        heroLogoScale = nearestHeroScale(heroLogoScale),
+        heroTitleScale = nearestHeroScale(heroTitleScale),
     )
 }
+
+/** Header channel logo / Header title size choices (×). */
+val HERO_SCALES = listOf(.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+fun nearestHeroScale(f: Float): Float = HERO_SCALES.minBy { kotlin.math.abs(it - f) }
 
 /** Channels in guide choices with the Large header. */
 val GUIDE_ROWS = listOf(5, 6, 7, 8, 9)

@@ -7,6 +7,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * The guide's brand logo (Appearance › Live TV › Brand logo): the picked image is copied into app storage, so it
@@ -31,7 +33,7 @@ object BrandLogo {
                         val n = input.read(buf)
                         if (n < 0) break
                         total += n
-                        if (total > MAX_BYTES) throw IOException("too large")
+                        if (total > MAX_BYTES) throw TooLarge()
                         out.write(buf, 0, n)
                     }
                 }
@@ -39,7 +41,7 @@ object BrandLogo {
             // Only the header is decoded: checks it's an image BitmapFactory (and so Coil) can show.
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(tmp.path, o)
-            if (o.outWidth <= 0 || o.outHeight <= 0) throw IOException("not an image")
+            if (o.outWidth <= 0 || o.outHeight <= 0) throw NotImage()
             val ext = when (o.outMimeType) { "image/jpeg" -> "jpg"; "image/webp" -> "webp"; "image/gif" -> "gif"; else -> "png" }
             val dest = File(d, "logo_${System.currentTimeMillis()}.$ext")
             if (!tmp.renameTo(dest)) throw IOException("rename failed")
@@ -50,6 +52,15 @@ object BrandLogo {
             tmp.delete()
         }
     }
+
+    /** Why a logo wasn't taken; the current one stays. */
+    class TooLarge : IOException("too large")
+    class NotImage : IOException("not an image")
+    class HttpFailure(val code: Int) : IOException("HTTP $code")
+
+    /** A typed Logo image URL when it's a usable http(s) address with a host; null otherwise. */
+    fun validUrl(text: String): HttpUrl? = text.trim().takeIf { it.startsWith("http://", true) || it.startsWith("https://", true) }
+        ?.takeIf { ' ' !in it }?.toHttpUrlOrNull()?.takeIf { it.host.isNotBlank() }
 
     /** Reset to default: the copy goes too. */
     suspend fun clear(context: Context) = withContext(Dispatchers.IO) { dir(context).deleteRecursively(); Unit }

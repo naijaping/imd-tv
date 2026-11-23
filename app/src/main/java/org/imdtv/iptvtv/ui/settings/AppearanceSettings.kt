@@ -1,10 +1,27 @@
 package org.imdtv.iptvtv.ui.settings
 
 import androidx.compose.ui.res.stringResource
+import org.imdtv.iptvtv.data.settings.HERO_SCALES
+import org.imdtv.iptvtv.ui.theme.LocalTheme
+import kotlinx.coroutines.delay
+import coil.compose.AsyncImage
+import androidx.tv.material3.Text
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import org.imdtv.iptvtv.R
 
 import org.imdtv.iptvtv.data.settings.ThemeColour
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +30,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -70,6 +86,7 @@ fun AppearanceLiveRows(vm: SettingsViewModel, first: FocusRequester) {
         if (s.theme == ThemeId.CELESTIAL_GLASS) {
             SwitchRow(stringResource(R.string.set_a_preview_fade), stringResource(R.string.set_a_preview_fade_expl), s.previewFade) { on -> vm.update { it.copy(previewFade = on) } }
         }
+        HeroSizeRows(vm, s)
         BrandLogoRow(vm, s)
     }
     SwitchRow(stringResource(R.string.set_a_live_indicator), stringResource(R.string.set_a_live_indicator_expl), s.showLiveIndicator) { on -> vm.update { it.copy(showLiveIndicator = on) } }
@@ -100,42 +117,76 @@ fun DateTimeRows(vm: SettingsViewModel, first: FocusRequester) {
 
 private const val IMAGE = "image/*"
 
+/** "0.75×", "1×", "1.5×". */
+private fun scaleLabel(f: Float) = (if (f % 1f == 0f) f.toInt().toString() else f.toString()) + "×"
+
+/** Header channel logo / Header title size and their reset (the guide header's top left). */
+@Composable
+private fun HeroSizeRows(vm: SettingsViewModel, s: AppSettings) {
+    val d = AppSettings()
+    ChoiceRow(stringResource(R.string.set_a_hero_logo_size), stringResource(R.string.set_a_hero_logo_size_expl), HERO_SCALES, s.heroLogoScale, { scaleLabel(it) }, default = d.heroLogoScale) { v -> vm.update { it.copy(heroLogoScale = v) } }
+    ChoiceRow(stringResource(R.string.set_a_hero_title_size), stringResource(R.string.set_a_hero_title_size_expl), HERO_SCALES, s.heroTitleScale, { scaleLabel(it) }, default = d.heroTitleScale) { v -> vm.update { it.copy(heroTitleScale = v) } }
+    // Greyed (still focusable, so the list scrolls past it) while both are at their default.
+    SettingRow(stringResource(R.string.set_a_hero_reset), stringResource(R.string.set_a_hero_reset_expl), null,
+        enabled = s.heroLogoScale != d.heroLogoScale || s.heroTitleScale != d.heroTitleScale) {
+        vm.update { it.copy(heroLogoScale = d.heroLogoScale, heroTitleScale = d.heroTitleScale) }
+    }
+}
+
 /**
- * Brand logo: Choose image opens a file manager (the pick is copied into app storage, see BrandLogo); a TV without one,
- * or whose picker won't start, gets an image address box instead. Reset to default brings back the app's logo.
+ * Brand logo: a Logo image URL box (typed with the remote's on-screen keyboard), a preview of it, Apply and Reset to
+ * default. Apply downloads it into app storage (BrandLogo); a failure says why and keeps the logo in use.
+ * Choose from files shows only when an app can really take the request (canPickFile), so Android TV's "You don't have
+ * an app that can do that" never appears.
  */
 @Composable
 private fun BrandLogoRow(vm: SettingsViewModel, s: AppSettings) {
     val context = LocalContext.current
+    val colors = LocalTheme.current.colors
     val status by vm.brandStatus.collectAsState()
-    var urlMode by remember { mutableStateOf(!canPickFile(context, IMAGE)) }
-    var editing by remember { mutableStateOf(false) }
-    var url by remember { mutableStateOf("https://") }
+    var canPick by remember { mutableStateOf(canPickFile(context, IMAGE)) }
+    var draft by remember(s.brandLogoUrl) { mutableStateOf(s.brandLogoUrl.orEmpty()) }
     val fieldFocus = remember { FocusRequester() }
-    val chooseFocus = remember { FocusRequester() }
+    val applyFocus = remember { FocusRequester() }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r -> r.data?.data?.let(vm::setBrandLogo) }
-    val custom = BrandLogo.existing(s.brandLogoPath) != null
-    fun choose() {
-        if (urlMode) { editing = true; return }
-        // Google TV builds without DocumentsUI: no activity takes the chooser; fall back to an address.
-        try { pick.launch(pickFileIntent(IMAGE)) } catch (e: android.content.ActivityNotFoundException) { urlMode = true; editing = true }
-    }
-    fun closeUrl() { runCatching { chooseFocus.requestFocus() }; editing = false }
-    BackHandler(enabled = editing) { closeUrl() }
+    val current = BrandLogo.existing(s.brandLogoPath)
+    // The preview follows the box once typing pauses and the text is an address; until then it shows the logo in use.
+    var previewUrl by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(draft) { delay(600); previewUrl = BrandLogo.validUrl(draft)?.toString() }
+    var previewFailed by remember(previewUrl) { mutableStateOf(false) }
+    val badUrl = stringResource(R.string.set_a_brand_logo_bad_url)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SettingRow(stringResource(R.string.set_a_brand_logo),
-            status ?: if (urlMode) stringResource(R.string.set_a_brand_logo_expl_url) else stringResource(R.string.set_a_brand_logo_expl),
-            if (custom) stringResource(R.string.set_a_brand_logo_custom) else stringResource(R.string.set_a_brand_logo_default)) { choose() }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PillButton(stringResource(R.string.set_a_brand_logo_choose), Modifier.focusRequester(chooseFocus)) { choose() }
-            if (custom) PillButton(stringResource(R.string.set_a_brand_logo_reset)) { vm.resetBrandLogo() }
+        SettingRow(stringResource(R.string.set_a_brand_logo), stringResource(R.string.set_a_brand_logo_expl),
+            if (current != null) stringResource(R.string.set_a_brand_logo_custom) else stringResource(R.string.set_a_brand_logo_default)) {
+            runCatching { fieldFocus.requestFocus() }
         }
-        if (editing) {
-            LaunchedEffect(Unit) { withFrameNanos { }; runCatching { fieldFocus.requestFocus() } }
-            Field(stringResource(R.string.set_a_brand_logo_url), url, KeyboardType.Uri, modifier = Modifier.focusRequester(fieldFocus)) { url = it }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
-                PillButton(stringResource(R.string.set_a_save)) { vm.setBrandLogoUrl(url); closeUrl() }
-                PillButton(stringResource(R.string.set_a_cancel)) { closeUrl() }
+        Field(stringResource(R.string.set_a_brand_logo_url), draft, KeyboardType.Uri, modifier = Modifier.focusRequester(fieldFocus), openOnOk = true) { draft = it }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // The guide's slot, on the guide's background: the same Fit and left alignment.
+            Box(Modifier.size(200.dp, 48.dp).clip(RoundedCornerShape(8.dp)).background(Brush.linearGradient(colors.bg)).padding(horizontal = 8.dp, vertical = 6.dp)) {
+                val m = Modifier.fillMaxSize()
+                val url = previewUrl?.takeIf { it != s.brandLogoUrl || current == null }
+                when {
+                    url != null -> AsyncImage(url, null, m, alignment = Alignment.CenterStart, contentScale = ContentScale.Fit,
+                        onError = { previewFailed = true }, onSuccess = { previewFailed = false })
+                    current != null -> AsyncImage(current, null, m, alignment = Alignment.CenterStart, contentScale = ContentScale.Fit)
+                    else -> Image(painterResource(R.drawable.logo), null, m, alignment = Alignment.CenterStart, contentScale = ContentScale.Fit)
+                }
+            }
+            Text(status ?: if (previewFailed) stringResource(R.string.set_a_brand_logo_preview_failed) else stringResource(R.string.set_a_brand_logo_preview),
+                fontSize = 13.sp, color = if (status != null || previewFailed) Color.White else colors.muted, modifier = Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+            PillButton(stringResource(R.string.set_a_brand_logo_apply), Modifier.focusRequester(applyFocus)) {
+                if (BrandLogo.validUrl(draft) == null) vm.brandStatus.value = badUrl else vm.setBrandLogoUrl(draft)
+            }
+            if (current != null) PillButton(stringResource(R.string.set_a_brand_logo_reset)) {
+                runCatching { applyFocus.requestFocus() } // this button goes: focus must not fall out of the page
+                vm.resetBrandLogo(); draft = ""
+            }
+            if (canPick) PillButton(stringResource(R.string.set_a_brand_logo_choose)) {
+                try { pick.launch(pickFileIntent(IMAGE)) }
+                catch (e: android.content.ActivityNotFoundException) { runCatching { applyFocus.requestFocus() }; canPick = false }
             }
         }
     }

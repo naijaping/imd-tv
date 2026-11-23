@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +56,9 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val previewFade = booleanPreferencesKey("preview_fade")
     private val showLiveIndicator = booleanPreferencesKey("show_live_indicator")
     private val brandLogoPath = stringPreferencesKey("brand_logo_path")
+    private val brandLogoUrl = stringPreferencesKey("brand_logo_url")
+    private val heroLogoScale = floatPreferencesKey("hero_logo_scale")
+    private val heroTitleScale = floatPreferencesKey("hero_title_scale")
     private val startOnBoot = booleanPreferencesKey("start_on_boot")
     private val interval = intPreferencesKey("epg_update_interval_hours")
     private val playlistHours = intPreferencesKey("playlist_update_hours")
@@ -142,6 +146,9 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             previewFade = this[previewFade] ?: d.previewFade,
             showLiveIndicator = this[showLiveIndicator] ?: d.showLiveIndicator,
             brandLogoPath = this[brandLogoPath],
+            brandLogoUrl = this[brandLogoUrl],
+            heroLogoScale = this[heroLogoScale] ?: d.heroLogoScale,
+            heroTitleScale = this[heroTitleScale] ?: d.heroTitleScale,
             startOnBoot = this[startOnBoot] ?: d.startOnBoot,
             epgUpdateIntervalHours = this[interval] ?: d.epgUpdateIntervalHours,
             playlistUpdateHours = this[playlistHours] ?: d.playlistUpdateHours,
@@ -220,6 +227,9 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         this[previewFade] = s.previewFade
         this[showLiveIndicator] = s.showLiveIndicator
         s.brandLogoPath?.let { this[brandLogoPath] = it } ?: remove(brandLogoPath)
+        s.brandLogoUrl?.let { this[brandLogoUrl] = it } ?: remove(brandLogoUrl)
+        this[heroLogoScale] = s.heroLogoScale
+        this[heroTitleScale] = s.heroTitleScale
         this[startOnBoot] = s.startOnBoot
         this[interval] = s.epgUpdateIntervalHours
         this[playlistHours] = s.playlistUpdateHours

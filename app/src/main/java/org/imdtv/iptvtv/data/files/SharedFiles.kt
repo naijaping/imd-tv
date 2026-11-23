@@ -102,7 +102,12 @@ fun pickFileIntent(mime: String, title: CharSequence? = null): Intent = Intent.c
 
 private val PHOTO_PICKER = listOf("com.google.android.providers.media.module", "com.android.providers.media.module")
 
-fun canPickFile(context: Context, mime: String): Boolean = getContent(mime).resolveActivity(context.packageManager) != null
+/**
+ * True when an app [pickFileIntent] actually offers can take the request. The photo picker doesn't count: the chooser
+ * leaves it out, and when it was the only taker Android TV showed "You don't have an app that can do that".
+ */
+fun canPickFile(context: Context, mime: String): Boolean =
+    context.packageManager.queryIntentActivities(getContent(mime), 0).any { it.activityInfo?.packageName !in PHOTO_PICKER }
 
 /** The picked file's name (content URIs ask the provider; file URIs use the path). */
 fun displayName(context: Context, uri: Uri): String? =

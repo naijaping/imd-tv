@@ -99,7 +99,7 @@ class SearchRepository(private val db: AppDatabase) {
         rows.mapNotNull { r ->
             val ch = channels[byKey[r.epgChannelKey]?.channelId] ?: return@mapNotNull null
             val off = sources[r.sourceId]?.let { effectiveOffsetMinutes(ch, it) * 60_000L } ?: 0L
-            GuideHit(ch, org.imdtv.iptvtv.data.repo.GuideProgramme(r.title, r.desc, r.episodeNum, r.start + off, r.stop + off, r.ageRating))
+            GuideHit(ch, org.imdtv.iptvtv.data.repo.GuideProgramme(r.title, r.desc, r.episodeNum, r.start + off, r.stop + off, r.ageRating, r.icon?.takeIf { it.isNotBlank() }))
         }.filter { it.p.stop > now }.sortedBy { it.p.start }.take(cap)
     }
 

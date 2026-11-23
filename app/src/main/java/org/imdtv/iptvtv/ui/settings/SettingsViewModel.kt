@@ -1,5 +1,6 @@
 package org.imdtv.iptvtv.ui.settings
 
+import org.imdtv.iptvtv.data.files.BrandLogo
 import org.imdtv.iptvtv.R
 import android.util.Log
 import androidx.room.withTransaction
@@ -281,38 +282,45 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun removePack() = launchFor { c.logoPack.remove(it); packStatus.value = null }
 
     // Brand logo (Appearance › Live TV): the guide's top-left image.
-    /** Under the Brand logo row: "Saving…", or why the last pick failed; null once saved. */
+    /** Under the Brand logo row: "Saving…", or why the last try failed (the current logo is kept); null once saved. */
     val brandStatus = MutableStateFlow<String?>(null)
     /** A picked file (content or file URI). */
-    fun setBrandLogo(uri: Uri) = saveBrandLogo { getApplication<Application>().contentResolver.openInputStream(uri) ?: throw java.io.IOException("unreadable") }
-    /** No file picker on this TV: an image address instead. */
+    fun setBrandLogo(uri: Uri) = saveBrandLogo(null) { getApplication<Application>().contentResolver.openInputStream(uri) ?: throw java.io.IOException("unreadable") }
+    /** Logo image URL › Apply: downloaded (20 s at most), checked to be an image, then kept in app storage. */
     fun setBrandLogoUrl(url: String) {
-        val u = url.trim()
-        if (!u.startsWith("http://", ignoreCase = true) && !u.startsWith("https://", ignoreCase = true)) { brandStatus.value = str(R.string.set_a_brand_logo_bad_url); return }
-        saveBrandLogo {
-            val r = c.http.newCall(okhttp3.Request.Builder().url(u).build()).execute()
-            if (!r.isSuccessful) { r.close(); throw java.io.IOException("HTTP ${r.code}") }
+        val u = BrandLogo.validUrl(url) ?: run { brandStatus.value = str(R.string.set_a_brand_logo_bad_url); return }
+        saveBrandLogo(u.toString()) {
+            val r = brandHttp.newCall(okhttp3.Request.Builder().url(u).build()).execute()
+            if (!r.isSuccessful) { r.close(); throw BrandLogo.HttpFailure(r.code) }
             r.body?.byteStream() ?: throw java.io.IOException("empty")
         }
     }
-    private fun saveBrandLogo(open: () -> java.io.InputStream) {
+    private val brandHttp by lazy { c.http.newBuilder().callTimeout(20, java.util.concurrent.TimeUnit.SECONDS).build() }
+    private fun saveBrandLogo(url: String?, open: () -> java.io.InputStream) {
         if (brandStatus.value == str(R.string.set_a_brand_logo_saving)) return // a second OK while one runs
         brandStatus.value = str(R.string.set_a_brand_logo_saving)
         viewModelScope.launch {
             brandStatus.value = try {
-                val path = org.imdtv.iptvtv.data.files.BrandLogo.save(getApplication(), open)
-                c.settings.update { it.copy(brandLogoPath = path) }
+                val path = BrandLogo.save(getApplication(), open)
+                c.settings.update { it.copy(brandLogoPath = path, brandLogoUrl = url) }
                 null
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.w("IptvBrand", "Brand logo not saved: $e")
-                str(R.string.set_a_brand_logo_failed)
+                when (e) {
+                    is BrandLogo.HttpFailure -> str(R.string.set_a_brand_logo_http, e.code)
+                    is BrandLogo.NotImage -> str(R.string.set_a_brand_logo_not_image)
+                    is BrandLogo.TooLarge -> str(R.string.set_a_brand_logo_too_large)
+                    is java.io.InterruptedIOException -> str(R.string.set_a_brand_logo_timeout) // call/read timeout
+                    is java.net.UnknownHostException, is java.net.ConnectException -> str(R.string.set_a_brand_logo_unreachable)
+                    else -> str(R.string.set_a_brand_logo_failed)
+                }
             }
         }
     }
     fun resetBrandLogo() = viewModelScope.launch {
-        c.settings.update { it.copy(brandLogoPath = null) }
-        org.imdtv.iptvtv.data.files.BrandLogo.clear(getApplication())
+        c.settings.update { it.copy(brandLogoPath = null, brandLogoUrl = null) }
+        BrandLogo.clear(getApplication())
         brandStatus.value = null
     }
 
