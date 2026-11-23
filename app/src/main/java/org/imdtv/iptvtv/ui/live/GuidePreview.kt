@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -76,8 +77,10 @@ internal fun backgroundBitmap(colors: ThemeColors, density: androidx.compose.ui.
 enum class PreviewEdge { FADE, NONE, RIM }
 
 @Composable
-fun Preview(vm: LiveViewModel, visible: Boolean, screen: Size, modifier: Modifier, edge: PreviewEdge = PreviewEdge.FADE) {
+fun Preview(vm: LiveViewModel, visible: Boolean, screen: Size, modifier: Modifier, edge: PreviewEdge = PreviewEdge.FADE,
+            /** The LIVE badge's distance from the top (Glass's full-corner preview moves it below the nav). */ badgeTop: androidx.compose.ui.unit.Dp = 30.dp) {
     var origin by remember { mutableStateOf(Offset.Zero) }
+    val showBadge = vm.settings.collectAsState().value.showLiveIndicator
     val colors = LocalTheme.current.colors
     Box(modifier.size(530.dp, 300.dp).onGloballyPositioned { origin = it.positionInRoot() }) {
         // SurfaceView (PlayerView default): video goes to a hardware overlay, so playing it doesn't redraw the UI.
@@ -124,8 +127,9 @@ fun Preview(vm: LiveViewModel, visible: Boolean, screen: Size, modifier: Modifie
             }
             onDrawBehind { drawImage(left); drawImage(bottom) }
         })
-        Row(
-            Modifier.align(Alignment.TopEnd).padding(top = 30.dp, end = 45.dp).clip(RoundedCornerShape(10.dp))
+        // Off: not composed at all, so nothing is left in its place.
+        if (showBadge) Row(
+            Modifier.align(Alignment.TopEnd).padding(top = badgeTop, end = 45.dp).clip(RoundedCornerShape(10.dp))
                 .background(Color(0x59000000)).padding(horizontal = 7.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

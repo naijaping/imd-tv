@@ -316,4 +316,17 @@
     <string name="set_a_update_playlists_every">Update playlists every</string>
     <string name="set_a_update_playlists_every_expl">How often every playlist, Plex and Jellyfin server included, downloads again in the background</string>
     <string name="set_a_deleting">Deleting…</string>
+    <string name="set_a_live_indicator">LIVE indicator</string>
+    <string name="set_a_live_indicator_expl">The red-dot LIVE badge at the top right of the TV guide\'s preview</string>
+    <string name="set_a_brand_logo">Brand logo</string>
+    <string name="set_a_brand_logo_expl">The image at the top left of the TV guide; it\'s copied to the app, so the original can move</string>
+    <string name="set_a_brand_logo_expl_url">The image at the top left of the TV guide. This TV has no file picker: enter the image\'s address</string>
+    <string name="set_a_brand_logo_default">Default</string>
+    <string name="set_a_brand_logo_custom">Custom</string>
+    <string name="set_a_brand_logo_choose">Choose image</string>
+    <string name="set_a_brand_logo_reset">Reset to default</string>
+    <string name="set_a_brand_logo_url">Image URL</string>
+    <string name="set_a_brand_logo_saving">Saving…</string>
+    <string name="set_a_brand_logo_failed">Couldn\'t use that image: pick a PNG, JPEG or WebP under 8 MB</string>
+    <string name="set_a_brand_logo_bad_url">Enter an address starting with http:// or https://</string>
 </resources>

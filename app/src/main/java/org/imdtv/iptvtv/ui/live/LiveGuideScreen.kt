@@ -41,6 +41,15 @@ import org.imdtv.iptvtv.data.db.ChannelEntity
 import org.imdtv.iptvtv.data.settings.HeaderSize
 import androidx.compose.foundation.border
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
+import coil.compose.AsyncImage
+import org.imdtv.iptvtv.data.files.BrandLogo
 
 @Composable
 fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen: (ChannelEntity) -> Unit) {
@@ -69,12 +78,14 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
     }) {
         Preview(vm, visible = state.previewing, screen = screen,
             edge = if (boxed) PreviewEdge.RIM else PreviewEdge.FADE, // rounded like the rest of the glass themes
+            // Fade: the preview reaches the top, where the shifted nav's clock now runs; the badge goes below it.
+            badgeTop = if (boxed) 30.dp else 58.dp,
             // Boxed: a smaller framed preview clear of the description panel; top and height match the hero panel,
             // so the nav pill never overlaps it. Fade: full corner preview, shrunk with the header.
             modifier = Modifier.align(Alignment.TopEnd).then(
                 if (boxed) Modifier.padding(top = 80.dp, end = 30.dp).size(boxH * 16 / 9, boxH)
                 else Modifier.size((300.dp - shift) * 53 / 30, 300.dp - shift)))
-        Box(Modifier.padding(start = 24.dp, top = 22.dp)) { nav() }
+        BrandAndNav(settings.brandLogoPath, nav, Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp))
         // Medium/Small: the hero runs up to the preview, so the description fits beside the title.
         val previewW = if (boxed) boxH * 16 / 9 + 30.dp else (300.dp - shift) * 53 / 30
         // Celestial Glass with the faded preview: Sky Glass style, text across ~60% of the screen over the faded video.
@@ -124,4 +135,38 @@ private fun GuideHero(vm: LiveViewModel, modifier: Modifier, size: HeaderSize, s
     val hero = channels.find { it.id == focused?.id } ?: focused // the list has the renamed copy
     Hero(hero, hero?.displayName(strip).orEmpty(), programmes[focused?.id].orEmpty(), now, logoSource, heroBadges(focused?.id, previewingId, formats), modifier, size,
         at = Timeline.cursorAt(cursor, now, vm.inPast.collectAsState().value), sky = sky)
+}
+
+/** The brand logo slot: at most this wide (less when the nav needs the room), always this tall. */
+private val BRAND_LOGO_MAX = 200.dp
+private val BRAND_LOGO_HEIGHT = 32.dp
+private val BRAND_LOGO_GAP = 12.dp
+
+/**
+ * Top left: the brand logo, then the nav to its right. The logo takes what the nav leaves, up to [BRAND_LOGO_MAX], so
+ * the clock and ping at the nav's end stay on screen; the row is the nav's height, so the bar is as tall as before.
+ * The logo isn't focusable: Up from the guide still enters the nav on the selected tab.
+ */
+@Composable
+private fun BrandAndNav(path: String?, nav: @Composable () -> Unit, modifier: Modifier) {
+    Layout(content = { BrandLogoImage(path); Box { nav() } }, modifier) { m, c ->
+        val navP = m[1].measure(Constraints(maxHeight = c.maxHeight)) // its natural width
+        val gap = BRAND_LOGO_GAP.roundToPx()
+        val w = (c.maxWidth - navP.width - gap).coerceIn(0, BRAND_LOGO_MAX.roundToPx())
+        val logoP = m[0].measure(Constraints.fixed(w, BRAND_LOGO_HEIGHT.roundToPx()))
+        val navX = if (w > 0) w + gap else 0
+        layout(c.constrainWidth(navX + navP.width), c.constrainHeight(navP.height)) {
+            logoP.place(0, (navP.height - logoP.height) / 2) // centred on the nav; may reach a little above and below it
+            navP.place(navX, 0)
+        }
+    }
+}
+
+/** The chosen image scaled to fit (aspect kept), left-aligned; the app's logo by default or when the copy is gone. */
+@Composable
+private fun BrandLogoImage(path: String?) {
+    val file = remember(path) { BrandLogo.existing(path) }
+    val m = Modifier.fillMaxSize()
+    if (file == null) Image(painterResource(R.drawable.logo), null, m, alignment = Alignment.CenterStart, contentScale = ContentScale.Fit)
+    else AsyncImage(file, null, m, error = painterResource(R.drawable.logo), alignment = Alignment.CenterStart, contentScale = ContentScale.Fit)
 }

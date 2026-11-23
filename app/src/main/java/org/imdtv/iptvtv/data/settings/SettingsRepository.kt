@@ -53,6 +53,8 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val favouritesSortBy = stringPreferencesKey("favourites_sort_by")
     private val headerSize = stringPreferencesKey("header_size")
     private val previewFade = booleanPreferencesKey("preview_fade")
+    private val showLiveIndicator = booleanPreferencesKey("show_live_indicator")
+    private val brandLogoPath = stringPreferencesKey("brand_logo_path")
     private val startOnBoot = booleanPreferencesKey("start_on_boot")
     private val interval = intPreferencesKey("epg_update_interval_hours")
     private val playlistHours = intPreferencesKey("playlist_update_hours")
@@ -138,6 +140,8 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             favouritesSortBy = this[favouritesSortBy]?.let { n -> org.imdtv.iptvtv.data.db.SortBy.entries.find { it.name == n } },
             headerSize = HeaderSize.entries.find { it.name == this[headerSize] } ?: d.headerSize,
             previewFade = this[previewFade] ?: d.previewFade,
+            showLiveIndicator = this[showLiveIndicator] ?: d.showLiveIndicator,
+            brandLogoPath = this[brandLogoPath],
             startOnBoot = this[startOnBoot] ?: d.startOnBoot,
             epgUpdateIntervalHours = this[interval] ?: d.epgUpdateIntervalHours,
             playlistUpdateHours = this[playlistHours] ?: d.playlistUpdateHours,
@@ -214,6 +218,8 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         s.favouritesSortBy?.let { this[favouritesSortBy] = it.name } ?: remove(favouritesSortBy)
         this[headerSize] = s.headerSize.name
         this[previewFade] = s.previewFade
+        this[showLiveIndicator] = s.showLiveIndicator
+        s.brandLogoPath?.let { this[brandLogoPath] = it } ?: remove(brandLogoPath)
         this[startOnBoot] = s.startOnBoot
         this[interval] = s.epgUpdateIntervalHours
         this[playlistHours] = s.playlistUpdateHours

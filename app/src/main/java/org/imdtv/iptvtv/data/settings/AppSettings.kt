@@ -181,6 +181,10 @@ data class AppSettings(
     val catchUpOn: Boolean = true,
     val headerSize: HeaderSize = HeaderSize.LARGE,
     val previewFade: Boolean = true,
+    /** The red-dot LIVE badge at the top right of the guide's preview. */
+    val showLiveIndicator: Boolean = true,
+    /** Celestial/Liquid Glass guide, top left: a copy of the chosen image in app storage (BrandLogo); null = the app's logo. Not backed up: per box. */
+    val brandLogoPath: String? = null,
     /** Other themes' [look]s by theme name, so a glass theme's colour/header/rows don't carry to another theme. */
     val themeLooks: Map<String, String> = emptyMap(),
     /** Open-source guide files (URLs) turned off in EPG sources: kept in the list, never imported or matched. */
@@ -218,7 +222,8 @@ data class AppSettings(
     fun resetAppearance() = AppSettings().let { d ->
         copy(theme = d.theme, themeColour = d.themeColour, themeDark = d.themeDark, guideRows = d.guideRows, headerSize = d.headerSize,
             previewFade = d.previewFade, themeLooks = emptyMap(), multiLineGuide = d.multiLineGuide, showDateTime = d.showDateTime,
-            showDate = d.showDate, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize)
+            showDate = d.showDate, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
+            showLiveIndicator = d.showLiveIndicator)
     }
 
     fun clamped() = copy(
