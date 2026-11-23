@@ -1,48 +1,41 @@
 package org.imdtv.iptvtv.ui.live
 
+import org.imdtv.iptvtv.data.settings.HERO_SCALES
+import org.imdtv.iptvtv.data.settings.HeaderSize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Header channel logo / Header title size at their largest: the header still fits above the "◀ category" line. */
+/** The header plan: one stacked layout, sizes shrink to fit; see HeroLayoutTest for the rendered check. */
 class HeroFitTest {
-    // A 960×540dp TV (1080p and 720p alike): Glass 204dp above the category line (less the header shift), Liquid 208dp.
-    private val glassRoom = mapOf("LARGE" to 204f, "MEDIUM" to 134f, "SMALL" to 74f)
-    private val liquidRoom = mapOf("LARGE" to 208f, "MEDIUM" to 138f, "SMALL" to 78f)
-    private val titleSp = mapOf("LARGE" to 31f, "MEDIUM" to 31f * .85f, "SMALL" to 31f * .7f)
-
-    private fun block(size: String, sky: Boolean): HeroBlock {
-        val rowTop = size == "SMALL" || sky && size == "MEDIUM"
-        val skySmall = sky && size == "SMALL"
-        return HeroBlock(if (skySmall) 36f else 43f, titleSp.getValue(size), !rowTop, if (rowTop) (if (skySmall) 2f else 5f) else 14f,
-            progress = size != "SMALL", descLine = if (size == "LARGE" || sky) 19f + (if (sky && size != "LARGE") 2f else 7f) else 0f)
-    }
+    private val glass = mapOf(HeaderSize.LARGE to 204f, HeaderSize.MEDIUM to 134f, HeaderSize.SMALL to 74f)
 
     @Test fun defaultsAreUntouched() {
-        assertEquals(HeroScales(1f, 1f), fitHeroScales(1f, 1f, block("LARGE", false), 204f))
-        assertEquals(HeroScales(.75f, .75f), fitHeroScales(.75f, .75f, block("SMALL", true), 74f))
+        for ((size, room) in glass) assertEquals(1f, planHero(HeroBlock.of(size), 1f, 1f, true, true, room).logo)
     }
 
-    @Test fun roomyHeaderKeepsTheChoice() {
-        assertEquals(HeroScales(2f, 2f), fitHeroScales(2f, 2f, block("LARGE", false), Float.POSITIVE_INFINITY))
-        assertEquals(HeroScales(1.5f, 1f), fitHeroScales(1.5f, 1f, block("LARGE", false), 204f))
+    @Test fun largeAndMediumKeepProgressAtDefault() {
+        assertTrue(planHero(HeroBlock.of(HeaderSize.LARGE), 1f, 1f, true, true, 204f).progress)
+        assertTrue(planHero(HeroBlock.of(HeaderSize.MEDIUM), 1f, 1f, true, true, 134f).progress)
     }
 
-    @Test fun largestSizesFitEveryHeader() {
-        for ((rooms, name) in listOf(glassRoom to "glass", liquidRoom to "liquid")) for (size in listOf("LARGE", "MEDIUM", "SMALL")) for (sky in listOf(false, true)) {
-            val b = block(size, sky)
-            val room = rooms.getValue(size)
-            val f = fitHeroScales(2f, 2f, b, room)
-            // Fits, unless even 1× doesn't (then nothing grew).
-            assertTrue("$name $size sky=$sky: ${heroHeight(b, f.logo, f.title)} > $room",
-                heroHeight(b, f.logo, f.title) <= room || f == HeroScales(1f, 1f))
-            assertTrue(f.logo >= 1f && f.title >= 1f)
+    @Test fun unboundedKeepsTheChoice() {
+        val p = planHero(HeroBlock.of(HeaderSize.LARGE), 2f, 2f, true, true, Float.POSITIVE_INFINITY)
+        assertEquals(HeroPlan(2f, 2f, 2, true), p)
+    }
+
+    @Test fun everyCombinationFits() {
+        for ((size, room) in glass) for (l in HERO_SCALES) for (t in HERO_SCALES) {
+            val b = HeroBlock.of(size)
+            val p = planHero(b, l, t, true, true, room)
+            assertTrue("$size $l $t", heroHeight(b, p.logo, p.title, p.titleLines, p.progress, 0) <= room)
+            assertTrue(p.logo <= l && p.title <= t)
         }
     }
 
     @Test fun shrinksBothTogether() {
-        val f = fitHeroScales(2f, 2f, block("SMALL", true), 74f)
-        assertTrue(f.logo < 2f && f.title < 2f)
-        assertEquals(f.logo, f.title, .001f)
+        val p = planHero(HeroBlock.of(HeaderSize.MEDIUM), 2f, 2f, true, true, 134f)
+        assertTrue(p.logo < 2f && p.title < 2f)
+        assertEquals(p.logo, p.title, .001f)
     }
 }

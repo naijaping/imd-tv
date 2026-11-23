@@ -93,7 +93,7 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
         GuideHero(vm, Modifier.padding(start = 24.dp, top = 80.dp)
             .then(if (sky) Modifier.width(575.dp) else if (settings.headerSize == HeaderSize.LARGE) Modifier.width(450.dp) else Modifier.padding(end = previewW + 24.dp).fillMaxWidth())
             // Liquid Glass: a fixed-size panel, so moving focus doesn't re-rasterise it for each description length.
-            .then(if (backdrop != null) Modifier.height(232.dp - shift) else Modifier).glass().padding(inset), settings.headerSize, sky,
+            .then(if (backdrop != null) Modifier.height(232.dp - shift) else Modifier).glass().padding(inset), settings.headerSize,
             // Room above the "◀ category" line (Liquid: its panel less the padding): larger header sizes shrink to fit it.
             maxHeight = if (backdrop != null) 232.dp - shift - inset * 2 else gridTop - 18.dp - 80.dp - 4.dp,
             logoScale = settings.heroLogoScale, titleScale = settings.heroTitleScale)
@@ -125,7 +125,7 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
 
 /** The hero reads focus, guide and stream format itself, so a key press recomposes only it and the rows, not the screen. */
 @Composable
-private fun GuideHero(vm: LiveViewModel, modifier: Modifier, size: HeaderSize, sky: Boolean, maxHeight: androidx.compose.ui.unit.Dp, logoScale: Float, titleScale: Float) {
+private fun GuideHero(vm: LiveViewModel, modifier: Modifier, size: HeaderSize, maxHeight: androidx.compose.ui.unit.Dp, logoScale: Float, titleScale: Float) {
     val channels by vm.channels.collectAsState()
     val programmes by vm.programmes.collectAsState()
     val now by vm.now.collectAsState()
@@ -137,7 +137,7 @@ private fun GuideHero(vm: LiveViewModel, modifier: Modifier, size: HeaderSize, s
     val cursor by vm.cursor.collectAsState()
     val hero = channels.find { it.id == focused?.id } ?: focused // the list has the renamed copy
     Hero(hero, hero?.displayName(strip).orEmpty(), programmes[focused?.id].orEmpty(), now, logoSource, heroBadges(focused?.id, previewingId, formats), modifier, size,
-        at = Timeline.cursorAt(cursor, now, vm.inPast.collectAsState().value), sky = sky, logoScale = logoScale, titleScale = titleScale, maxHeight = maxHeight)
+        at = Timeline.cursorAt(cursor, now, vm.inPast.collectAsState().value), logoScale = logoScale, titleScale = titleScale, maxHeight = maxHeight)
 }
 
 /** The brand logo slot: at most this wide (less when the nav needs the room), always this tall. */
