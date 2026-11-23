@@ -129,4 +129,6 @@
     <string name="live_menu_merge_options">Merge options</string>
     <string name="live_menu_merge_options_title">Merge options · %1$s</string>
     <string name="live_rail_jump_hint">Hold up: top / previous playlist\nHold down: next playlist / bottom</string>
+    <string name="live_no_channels_in_category">No channels in this category</string>
+    <string name="live_loading_channels">"  Loading channels…"</string>
 </resources>

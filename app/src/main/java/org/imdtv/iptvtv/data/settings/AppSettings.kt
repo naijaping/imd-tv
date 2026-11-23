@@ -189,6 +189,8 @@ data class AppSettings(
     val brandLogoUrl: String? = null,
     /** Appearance › Live TV › Header channel logo / Header title size: multiplies the guide header's logo / title; one of [HERO_SCALES]. */
     val heroLogoScale: Float = 1f,
+    /** Appearance › Live TV › Branding logo size: the top-left logo slot's size; one of [BRAND_SCALES]. */
+    val brandLogoScale: Float = 1f,
     val heroTitleScale: Float = 1f,
     /** Other themes' [look]s by theme name, so a glass theme's colour/header/rows don't carry to another theme. */
     val themeLooks: Map<String, String> = emptyMap(),
@@ -228,7 +230,7 @@ data class AppSettings(
         copy(theme = d.theme, themeColour = d.themeColour, themeDark = d.themeDark, guideRows = d.guideRows, headerSize = d.headerSize,
             previewFade = d.previewFade, themeLooks = emptyMap(), multiLineGuide = d.multiLineGuide, showDateTime = d.showDateTime,
             showDate = d.showDate, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
-            showLiveIndicator = d.showLiveIndicator, heroLogoScale = d.heroLogoScale, heroTitleScale = d.heroTitleScale)
+            showLiveIndicator = d.showLiveIndicator, heroLogoScale = d.heroLogoScale, heroTitleScale = d.heroTitleScale, brandLogoScale = d.brandLogoScale)
     }
 
     fun clamped() = copy(
@@ -241,11 +243,15 @@ data class AppSettings(
         guideRows = guideRows.coerceIn(GUIDE_ROWS.first(), 15),
         heroLogoScale = nearestHeroScale(heroLogoScale),
         heroTitleScale = nearestHeroScale(heroTitleScale),
+        brandLogoScale = BRAND_SCALES.minBy { kotlin.math.abs(it - brandLogoScale) },
     )
 }
 
 /** Header channel logo / Header title size choices (×). */
 val HERO_SCALES = listOf(.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+/** Branding logo size choices (×). */
+val BRAND_SCALES = listOf(.5f, .75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
 fun nearestHeroScale(f: Float): Float = HERO_SCALES.minBy { kotlin.math.abs(it - f) }
 

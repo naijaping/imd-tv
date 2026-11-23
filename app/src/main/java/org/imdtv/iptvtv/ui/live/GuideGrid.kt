@@ -214,6 +214,12 @@ fun GuideGrid(
                     Triple(base.copy(rowHeight = row.toDp()).forGuide(multiLine, epg), (row * rows + gap * (rows - 1)).toDp(), wholeRowScroll(row + gap))
                 }
             }
+            // A category with no channels (once its list has arrived) says so instead of leaving the grid blank.
+            val loading by vm.listingLoading.collectAsState()
+            if (channels.isEmpty() && !loading && vm.entry.collectAsState().value != null) {
+                Text(stringResource(R.string.live_no_channels_in_category), fontSize = 16.sp, color = Color.White,
+                    modifier = Modifier.padding(start = 12.dp, top = 24.dp))
+            }
             CompositionLocalProvider(LocalBringIntoViewSpec provides (scrollSpec ?: LocalBringIntoViewSpec.current)) {
             LazyColumn(state = state.list, verticalArrangement = Arrangement.spacedBy(style.gap),
                 modifier = if (listHeight != null) Modifier.height(listHeight) else Modifier.fillMaxSize()) {

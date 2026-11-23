@@ -59,6 +59,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val brandLogoUrl = stringPreferencesKey("brand_logo_url")
     private val heroLogoScale = floatPreferencesKey("hero_logo_scale")
     private val heroTitleScale = floatPreferencesKey("hero_title_scale")
+    private val brandLogoScale = floatPreferencesKey("brand_logo_scale")
     private val startOnBoot = booleanPreferencesKey("start_on_boot")
     private val interval = intPreferencesKey("epg_update_interval_hours")
     private val playlistHours = intPreferencesKey("playlist_update_hours")
@@ -149,6 +150,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             brandLogoUrl = this[brandLogoUrl],
             heroLogoScale = this[heroLogoScale] ?: d.heroLogoScale,
             heroTitleScale = this[heroTitleScale] ?: d.heroTitleScale,
+            brandLogoScale = this[brandLogoScale] ?: d.brandLogoScale,
             startOnBoot = this[startOnBoot] ?: d.startOnBoot,
             epgUpdateIntervalHours = this[interval] ?: d.epgUpdateIntervalHours,
             playlistUpdateHours = this[playlistHours] ?: d.playlistUpdateHours,
@@ -230,6 +232,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         s.brandLogoUrl?.let { this[brandLogoUrl] = it } ?: remove(brandLogoUrl)
         this[heroLogoScale] = s.heroLogoScale
         this[heroTitleScale] = s.heroTitleScale
+        this[brandLogoScale] = s.brandLogoScale
         this[startOnBoot] = s.startOnBoot
         this[interval] = s.epgUpdateIntervalHours
         this[playlistHours] = s.playlistUpdateHours

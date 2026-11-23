@@ -152,6 +152,7 @@ data class BSettings(
     val showLiveIndicator: Boolean = AppSettings().showLiveIndicator,
     val heroLogoScale: Float = AppSettings().heroLogoScale,
     val heroTitleScale: Float = AppSettings().heroTitleScale,
+    val brandLogoScale: Float = AppSettings().brandLogoScale,
     val themeDark: Boolean = AppSettings().themeDark,
     /** The guide order with "Your EPG sources"; absent in older backups, whose [guideOrder] then gets it added. */
     val guideKinds: List<String>? = null,
@@ -180,7 +181,7 @@ data class BSettings(
             unlockFor = org.imdtv.iptvtv.data.parental.UnlockFor.entries.find { it.name == unlockFor } ?: org.imdtv.iptvtv.data.parental.UnlockFor.APP,
             catchUpOn = catchUpOn, holdBackOther = holdBackOther, guideTimeoutMin = guideTimeoutMin, favouritesSortBy = favouritesSortBy?.let { n -> org.imdtv.iptvtv.data.db.SortBy.entries.find { it.name == n } },
             headerSize = HeaderSize.entries.find { it.name == headerSize } ?: d.headerSize, previewFade = previewFade, themeDark = themeDark,
-            showLiveIndicator = showLiveIndicator, heroLogoScale = heroLogoScale, heroTitleScale = heroTitleScale,
+            showLiveIndicator = showLiveIndicator, heroLogoScale = heroLogoScale, heroTitleScale = heroTitleScale, brandLogoScale = brandLogoScale,
             startOnBoot = startOnBoot,
             epgUpdateIntervalHours = epgUpdateIntervalHours,
             epgUpdateOnStart = epgUpdateOnStart,
@@ -219,7 +220,7 @@ data class BSettings(
             guideRows = s.guideRows, multiLineGuide = s.multiLineGuide,
             zapLeftRight = s.zapLeftRight, backToFullScreen = s.backToFullScreen, showChannelNumbers = s.showChannelNumbers, clock24h = s.clock24h,
             playerClockMode = s.playerClock.name, showDate = s.showDate, themeLooks = s.themeLooks, guidesOff = s.guidesOff.toList(), liveSubtitlesOn = s.liveSubtitlesOn, showRecent = s.showRecent, videoAspect = s.videoAspect.name, vodTwoRows = s.vodTwoRows, titleSize = s.titleSize.name, vodTitleSize = s.vodTitleSize.name, epgTextSize = s.epgTextSize.name, guideDisplay = s.guideDisplay.name, vodSort = s.vodSort.name, parentalOn = s.parentalOn, parentalPin = s.parentalPin, parentalWord = s.parentalWord, ageLimit = s.ageLimit.name, unlockFor = s.unlockFor.name, catchUpOn = s.catchUpOn, holdBackOther = s.holdBackOther, guideTimeoutMin = s.guideTimeoutMin, favouritesSortBy = s.favouritesSortBy?.name,
-            headerSize = s.headerSize.name, previewFade = s.previewFade, showLiveIndicator = s.showLiveIndicator, heroLogoScale = s.heroLogoScale, heroTitleScale = s.heroTitleScale, themeDark = s.themeDark, guideKinds = s.guideOrder.map { it.name },
+            headerSize = s.headerSize.name, previewFade = s.previewFade, showLiveIndicator = s.showLiveIndicator, heroLogoScale = s.heroLogoScale, heroTitleScale = s.heroTitleScale, brandLogoScale = s.brandLogoScale, themeDark = s.themeDark, guideKinds = s.guideOrder.map { it.name },
             recordingOn = s.recordingOn, recordTo = s.recordTo.name, startEarlyMin = s.startEarlyMin, endLateMin = s.endLateMin,
             keepAwake = s.keepAwake, smbServer = s.smbServer, smbShare = s.smbShare, smbFolder = s.smbFolder, smbUser = s.smbUser, playlistUpdateHours = s.playlistUpdateHours,
         )

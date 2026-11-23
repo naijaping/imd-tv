@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.imdtv.iptvtv.ui.AppLogo
 import org.imdtv.iptvtv.ui.onLongOk
 import org.imdtv.iptvtv.data.repo.RailEntry
@@ -65,6 +66,10 @@ internal fun Rail(
     onClose: () -> Unit,
     others: List<org.imdtv.iptvtv.data.repo.OtherPlaylist> = emptyList(), expanded: Set<Long> = emptySet(),
     onToggle: (Long) -> Unit = {}, onPickOther: (org.imdtv.iptvtv.data.db.CategoryEntity) -> Unit = {},
+    /** The highlight moved onto this playlist's category [RailEntry] (the guide previews it). */
+    onHighlight: (RailEntry) -> Unit = {},
+    /** Focus entered or left the panel. */
+    onFocus: (Boolean) -> Unit = {},
 ) {
     val start = items.indexOfFirst { it.entry.key == selectedKey }.coerceAtLeast(0)
     val state = rememberLazyListState(start)
@@ -89,6 +94,7 @@ internal fun Rail(
             .then(if (LocalGlassBackdrop.current != null) Modifier.glass(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp))
                 else Modifier.shadow(30.dp).background(LocalTheme.current.colors.panel))
             .padding(horizontal = 20.dp, vertical = 35.dp)
+            .onFocusChanged { onFocus(it.hasFocus) }
             .onPreviewKeyEvent { e ->
                 val down = e.type == KeyEventType.KeyDown
                 if (move != null) {
@@ -121,6 +127,7 @@ internal fun Rail(
                 val isMoving = rc.entry.key == movingKey
                 FocusBox(
                     onClick = { onPick(rc.entry) },
+                    onFocused = { if (move == null) onHighlight(rc.entry) },
                     modifier = (if (i == start) Modifier.focusRequester(focus) else Modifier)
                         .then(if (isMoving) Modifier.focusRequester(moveFocus) else Modifier)
                         .then(if (rc.entry.key == focusKey) Modifier.focusRequester(keyFocus) else Modifier)
@@ -148,6 +155,9 @@ internal fun Rail(
     }
 }
 
+/** How long the highlight rests on a category before the guide shows it (spec: ~250–300ms). */
+internal const val CATEGORY_PREVIEW_MS = 275L
+
 /** Ends move mode; Back (cancel) puts the category back where it started. */
 internal fun endRailMove(vm: LiveViewModel, state: GuideState, rail: List<RailItem>, cancel: Boolean) {
     state.railMove?.let { m -> if (cancel) vm.moveRail(m.entry, m.from - rail.sameKindKeys(m.entry).indexOf(m.entry.key)) }
@@ -172,16 +182,42 @@ fun CategoryRail(vm: LiveViewModel, state: GuideState, modifier: Modifier = Modi
     val entry by vm.entry.collectAsState()
     val others by vm.otherPlaylists.collectAsState()
     val expanded by vm.expandedPlaylists.collectAsState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // The category showing when the panel opened: Back / Left (close) go back to it, OK / Right keep the one previewed.
+    val opened = remember { vm.entry.value }
+    // The guide follows the highlight once it rests (a fast scroll loads nothing in between); a newer highlight cancels the wait.
+    var highlighted by remember { androidx.compose.runtime.mutableStateOf<RailEntry?>(null) }
+    LaunchedEffect(highlighted) {
+        val h = highlighted ?: return@LaunchedEffect
+        if (h.key == vm.entry.value?.key || state.railMove != null) return@LaunchedEffect
+        kotlinx.coroutines.delay(CATEGORY_PREVIEW_MS)
+        vm.select(h)
+    }
+    // OK / Right: keep this category and go into the grid on its first channel.
+    fun pick(e: RailEntry) {
+        highlighted = null
+        if (vm.entry.value?.key == e.key) {
+            state.focusIndex = 0
+            scope.launch { state.list.scrollToItem(0) }
+        } else { state.atTop = true; vm.select(e) }
+        state.railOpen = false
+    }
     Box(modifier) {
         Rail(rail.orEmpty(), entry?.key, state.railFocus, state.railMove,
             keepKey = when (val m = state.menu) { is GuideMenu.Category -> "c${m.cat.id}"; is GuideMenu.Group -> "g${m.g.id}"; else -> null },
             focusKey = state.railFocusKey,
             onFocusKeyDone = { state.railFocusKey = null },
-            onPick = { vm.select(it); state.railOpen = false },
+            onPick = ::pick,
             onLongPress = { e -> railMenu(e)?.let { state.menu = it } },
             onMove = { d -> state.railMove?.let { vm.moveRail(it.entry, d) } },
             onMoveEnd = { cancel -> endRailMove(vm, state, rail.orEmpty(), cancel) },
-            onClose = { state.railOpen = false; state.refocus() },
+            onClose = {
+                highlighted = null
+                opened?.takeIf { it.key != vm.entry.value?.key }?.let(vm::select)
+                state.railOpen = false; state.refocus()
+            },
+            onHighlight = { highlighted = it },
+            onFocus = { state.railHasFocus = it },
             others = others, expanded = expanded, onToggle = { id -> vm.expandedPlaylists.value = vm.expandedPlaylists.value.toggled(id) },
             onPickOther = { cat -> vm.usePlaylistAt(cat.providerId, cat.id); state.railOpen = false })
     }

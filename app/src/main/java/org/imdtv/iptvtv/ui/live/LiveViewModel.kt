@@ -34,6 +34,8 @@ import org.imdtv.iptvtv.data.parental.parentalLocked
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -121,15 +123,32 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         .flatMapLatest { (p, e) -> if (e == null) flowOf(SortBy.PLAYLIST) else ChannelSort.observe(c.db, c.settings, p, e) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, SortBy.PLAYLIST)
 
+    /**
+     * The last list each recent category showed (by playlist, key and sort), so going back to one while browsing the
+     * category panel shows it at once; the live query replaces it a moment later.
+     */
+    private val listingCache = object : LinkedHashMap<String, List<ChannelEntity>>(32, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<ChannelEntity>>?) = size > 40
+    }
+
     val listing: StateFlow<Pair<String?, List<ChannelEntity>>> = combine(providerId, entry, selectedSort) { p, e, by -> Triple(p, e, by) }
         .distinctUntilChangedBy { (p, e, by) -> Triple(p, e?.key, by) }
+        // Latest: moving to another category cancels the load still running for the last one.
         .flatMapLatest { (p, e, by) ->
             if (e == null) flowOf(null to emptyList())
-            else combine(railRepo.channels(p, e), hideHeaders, strip) { list, hide, s ->
-                e.key to ChannelSort.sorted(if (hide) list.filterNot { isHeaderChannel(it.name) } else list, by, s)
+            else {
+                val k = "$p|${e.key}|$by"
+                combine(railRepo.channels(p, e), hideHeaders, strip) { list, hide, s ->
+                    e.key to ChannelSort.sorted(if (hide) list.filterNot { isHeaderChannel(it.name) } else list, by, s)
+                }.onEach { synchronized(listingCache) { listingCache[k] = it.second } }
+                    .onStart { synchronized(listingCache) { listingCache[k] }?.let { emit(e.key to it) } }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null to emptyList())
+
+    /** The selected category's channels haven't arrived yet (the guide shows "Loading channels…"). */
+    val listingLoading: StateFlow<Boolean> = combine(entry, listing) { e, l -> e != null && l.first != e.key }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** For the Sort by menu: how [e] is sorted, following changes. */
     fun sortOf(e: RailEntry): kotlinx.coroutines.flow.Flow<SortBy> = providerId.flatMapLatest { ChannelSort.observe(c.db, c.settings, it, e) }

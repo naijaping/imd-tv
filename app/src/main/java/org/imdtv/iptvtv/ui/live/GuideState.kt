@@ -29,6 +29,10 @@ class GuideState internal constructor(
     var refocusOnChange by mutableStateOf(false)
     var previewing by mutableStateOf(previewing)
     var railOpen by mutableStateOf(false)
+    /** The category panel holds focus (set by its own focus changes): a refocus then leaves it where the highlight is. */
+    internal var railHasFocus = false
+    /** Picked in the category panel: the guide opens on the category's first channel, not the one focused before. */
+    internal var atTop = false
     internal var menu by mutableStateOf<GuideMenu?>(null)
     internal var railMove by mutableStateOf<RailMove?>(null)
     /** A channel picked up from its long-press menu: the guide shows [RowMove.order] until OK drops it or Back cancels. */
@@ -114,16 +118,20 @@ fun rememberGuideState(vm: LiveViewModel, previews: Boolean = true): GuideState 
     // Re-entering from full screen recreates this state, so start on the channel being watched, not the top row.
     LaunchedEffect(entry?.key) {
         val ids = vm.listing.first { it.first == entry?.key }.second.map { it.id } // not the previous entry's list
-        state.focusIndex = Timeline.rowFor(ids, vm.focused.value?.id)
+        // Previewed from the category panel, or picked there: its first channel.
+        state.focusIndex = if (state.railOpen || state.atTop) 0 else Timeline.rowFor(ids, vm.focused.value?.id)
+        state.atTop = false
         if (state.restored) state.restored = false else list.scrollToItem(state.focusIndex)
-        state.refocus()
+        // Panel open (previewing while the highlight moves): the grid updates behind it and takes no focus.
+        if (!state.railOpen) state.refocus()
     }
     LaunchedEffect(state.refocusTick, channels.isNotEmpty(), state.railOpen) {
         withFrameNanos { }
         runCatching {
             val held = state.heldFocus
             when {
-                state.railOpen -> state.railFocus.requestFocus()
+                // Only when focus isn't in the panel yet: a list arriving while the highlight moves must not pull it back.
+                state.railOpen -> if (!state.railHasFocus) state.railFocus.requestFocus()
                 held != null -> held.requestFocus()
                 channels.isNotEmpty() -> state.rowFocus.requestFocus()
             }

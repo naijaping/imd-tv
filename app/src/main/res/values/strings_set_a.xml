@@ -342,4 +342,8 @@
     <string name="set_a_hero_title_size_expl">Size of the programme title at the top left of the TV guide</string>
     <string name="set_a_hero_reset">Reset header sizes</string>
     <string name="set_a_hero_reset_expl">Header channel logo and Header title size back to 1×</string>
+    <string name="set_a_brand_logo_size">Branding logo size</string>
+    <string name="set_a_brand_logo_size_expl">Size of the logo at the top left of the TV guide, default or custom; it keeps its shape</string>
+    <string name="set_a_brand_logo_size_reset">Reset logo size</string>
+    <string name="set_a_brand_logo_size_reset_expl">Branding logo size back to 1×</string>
 </resources>

@@ -4,6 +4,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import org.imdtv.iptvtv.data.settings.HERO_SCALES
+import org.imdtv.iptvtv.data.settings.BRAND_SCALES
 import org.imdtv.iptvtv.ui.theme.LocalTheme
 import kotlinx.coroutines.delay
 import coil.compose.AsyncImage
@@ -164,6 +165,14 @@ private fun BrandLogoRow(vm: SettingsViewModel, s: AppSettings) {
         SettingRow(stringResource(R.string.set_a_brand_logo), stringResource(R.string.set_a_brand_logo_expl),
             if (current != null) stringResource(R.string.set_a_brand_logo_custom) else stringResource(R.string.set_a_brand_logo_default)) {
             runCatching { fieldFocus.requestFocus() }
+        }
+        // Size first: it applies to the default logo and a custom one alike, straight away.
+        val d = AppSettings().brandLogoScale
+        ChoiceRow(stringResource(R.string.set_a_brand_logo_size), stringResource(R.string.set_a_brand_logo_size_expl), BRAND_SCALES, s.brandLogoScale, { scaleLabel(it) }, default = d) { v ->
+            vm.update { it.copy(brandLogoScale = v) }
+        }
+        SettingRow(stringResource(R.string.set_a_brand_logo_size_reset), stringResource(R.string.set_a_brand_logo_size_reset_expl), null, enabled = s.brandLogoScale != d) {
+            vm.update { it.copy(brandLogoScale = d) }
         }
         Field(stringResource(R.string.set_a_brand_logo_url), draft, KeyboardType.Uri, modifier = Modifier.focusRequester(fieldFocus), openOnOk = true) { draft = it }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

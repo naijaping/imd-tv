@@ -57,6 +57,7 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
     val rail by vm.rail.collectAsState()
     val entry by vm.entry.collectAsState()
     val updating by vm.guideUpdating.collectAsState()
+    val loadingChannels by vm.listingLoading.collectAsState()
     val settings = vm.settings.collectAsState().value
     // Header size: everything below the nav moves up by [shift]; the grid gains rows of about the same height.
     val shift = org.imdtv.iptvtv.data.settings.headerShiftDp(settings.headerSize).dp
@@ -85,7 +86,7 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
             modifier = Modifier.align(Alignment.TopEnd).then(
                 if (boxed) Modifier.padding(top = 80.dp, end = 30.dp).size(boxH * 16 / 9, boxH)
                 else Modifier.size((300.dp - shift) * 53 / 30, 300.dp - shift)))
-        BrandAndNav(settings.brandLogoPath, nav, Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp))
+        BrandAndNav(settings.brandLogoPath, settings.brandLogoScale, nav, Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp))
         // Medium/Small: the hero runs up to the preview, so the description fits beside the title.
         val previewW = if (boxed) boxH * 16 / 9 + 30.dp else (300.dp - shift) * 53 / 30
         // Celestial Glass with the faded preview: Sky Glass style, text across ~60% of the screen over the faded video.
@@ -108,9 +109,9 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
                 modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(colors.cellDim).padding(horizontal = 7.dp, vertical = 2.dp),
             )
             Text(stringResource(R.string.live_press_left), fontSize = 11.sp, color = colors.muted)
-            if (updating) {
+            if (loadingChannels || updating) {
                 Spacer(Modifier.width(16.dp)); Spinner(size = 11.dp, color = colors.muted)
-                Text(stringResource(R.string.live_updating_guide), fontSize = 11.sp, color = colors.muted)
+                Text(stringResource(if (loadingChannels) R.string.live_loading_channels else R.string.live_updating_guide), fontSize = 11.sp, color = colors.muted)
             }
         }
 
@@ -140,9 +141,11 @@ private fun GuideHero(vm: LiveViewModel, modifier: Modifier, size: HeaderSize, m
         at = Timeline.cursorAt(cursor, now, vm.inPast.collectAsState().value), logoScale = logoScale, titleScale = titleScale, maxHeight = maxHeight)
 }
 
-/** The brand logo slot: at most this wide (less when the nav needs the room), always this tall. */
+/** The brand logo slot at 1× (Branding logo size scales both): at most this wide (less when the nav needs the room), this tall. */
 private val BRAND_LOGO_MAX = 200.dp
 private val BRAND_LOGO_HEIGHT = 32.dp
+/** The slot's tallest: centred on the nav (centre ~35dp down), it stays clear of the screen top and the header at 80dp. */
+private val BRAND_LOGO_TALLEST = 64.dp
 private val BRAND_LOGO_GAP = 12.dp
 
 /**
@@ -151,12 +154,12 @@ private val BRAND_LOGO_GAP = 12.dp
  * The logo isn't focusable: Up from the guide still enters the nav on the selected tab.
  */
 @Composable
-private fun BrandAndNav(path: String?, nav: @Composable () -> Unit, modifier: Modifier) {
+private fun BrandAndNav(path: String?, scale: Float, nav: @Composable () -> Unit, modifier: Modifier) {
     Layout(content = { BrandLogoImage(path); Box { nav() } }, modifier) { m, c ->
         val navP = m[1].measure(Constraints(maxHeight = c.maxHeight)) // its natural width
         val gap = BRAND_LOGO_GAP.roundToPx()
-        val w = (c.maxWidth - navP.width - gap).coerceIn(0, BRAND_LOGO_MAX.roundToPx())
-        val logoP = m[0].measure(Constraints.fixed(w, BRAND_LOGO_HEIGHT.roundToPx()))
+        val w = (c.maxWidth - navP.width - gap).coerceIn(0, (BRAND_LOGO_MAX * scale).roundToPx())
+        val logoP = m[0].measure(Constraints.fixed(w, (BRAND_LOGO_HEIGHT * scale).coerceAtMost(BRAND_LOGO_TALLEST).roundToPx()))
         val navX = if (w > 0) w + gap else 0
         layout(c.constrainWidth(navX + navP.width), c.constrainHeight(navP.height)) {
             logoP.place(0, (navP.height - logoP.height) / 2) // centred on the nav; may reach a little above and below it
