@@ -9,7 +9,11 @@ import org.imdtv.iptvtv.data.model.Kind
 import org.imdtv.iptvtv.data.model.StreamFormat
 
 enum class ProviderType {
-    XTREAM, M3U, STALKER, PLEX, JELLYFIN, STREMIO;
+    XTREAM, M3U, STALKER, PLEX, JELLYFIN, STREMIO,
+    /** A Dispatcharr server: signed in with its own login, then loaded through its Xtream Codes API (DispatcharrAuth). */
+    DISPATCHARR;
+    /** Loaded through player_api.php with username + password (Dispatcharr's are the user's XC password). */
+    val xtream get() = this == XTREAM || this == DISPATCHARR
     /** Added under Settings › Media servers: Movies + Series only, no form, not in file backups. */
     val mediaServer get() = this == PLEX || this == JELLYFIN || this == STREMIO
 }
@@ -378,7 +382,7 @@ data class CustomGroupChannelEntity(
 
 /** The Xtream login, for filling the placeholders in saved links; null for M3U or a playlist without one. */
 fun ProviderEntity.login(): org.imdtv.iptvtv.data.security.Login? =
-    if (type == ProviderType.XTREAM && username != null && password != null) org.imdtv.iptvtv.data.security.Login(username, password)
+    if (type.xtream && username != null && password != null) org.imdtv.iptvtv.data.security.Login(username, password)
     // Stremio's key is the account's: never handed to an add-on's stream host.
     else if (type.mediaServer && type != ProviderType.STREMIO && password != null) org.imdtv.iptvtv.data.security.Login(username.orEmpty(), password) // fills X-Plex-Token / api_key
     else null

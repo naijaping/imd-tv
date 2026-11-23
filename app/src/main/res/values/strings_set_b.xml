@@ -332,4 +332,14 @@
     <string name="set_b_stremio_no_catalogs">The add-ons on this Stremio account have no movie or series catalogs</string>
     <string name="set_b_stremio_limit">Only direct links play: titles whose add-ons offer only torrents can\'t play here.</string>
     <string name="set_b_show">Show</string>
+    <string name="set_b_dp_password_or_key">Password or API key</string>
+    <string name="set_b_dp_password_keep">Password or API key (blank keeps the current login)</string>
+    <string name="set_b_dp_signing_in">Signing in to Dispatcharr…</string>
+    <string name="set_b_dp_enter_login">enter your Dispatcharr password or API key</string>
+    <string name="set_b_dp_wrong_login">wrong Dispatcharr username, password or API key</string>
+    <string name="set_b_dp_no_xc_password">user %1$s has no XC password. In Dispatcharr, an admin opens Users, edits this user and sets an XC password, then try again</string>
+    <string name="set_b_dp_blocked">Dispatcharr\'s network access settings block this TV (Settings › Network access in Dispatcharr)</string>
+    <string name="set_b_dp_rate_limited">too many sign-in attempts. Wait a minute and try again</string>
+    <string name="set_b_dp_not_dispatcharr">no Dispatcharr server at that address. Use the address you open Dispatcharr\'s web page with, e.g. http://192.168.1.10:9191</string>
+    <string name="set_b_dp_failed">Dispatcharr request failed: HTTP %1$d</string>
 </resources>

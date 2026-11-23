@@ -170,12 +170,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         form.value = FormState(busy = true)
         viewModelScope.launch {
-            val login = username.trim().ifEmpty { null }?.let { if (type == ProviderType.STALKER) it.uppercase() else it }
-            val pass = password.ifEmpty { null }
+            var login = username.trim().ifEmpty { null }?.let { if (type == ProviderType.STALKER) it.uppercase() else it }
+            var pass = password.ifEmpty { null }
+            var address = trimmed
+            if (type == ProviderType.DISPATCHARR) {
+                // Signs in with the Dispatcharr login and keeps the XC login it gives (DispatcharrAuth); editing with the
+                // password left blank and the same username keeps the saved one.
+                address = c.dispatcharr.base(trimmed) ?: trimmed
+                val keep = editing != null && password.isEmpty() && (login == null || login == editing.username)
+                if (keep) { login = editing!!.username; pass = editing.password }
+                else try {
+                    form.value = form.value.copy(progress = str(R.string.set_b_dp_signing_in))
+                    c.dispatcharr.xcLogin(address, username, password).let { login = it.username; pass = it.password }
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    android.util.Log.w("AppViewModel", "Dispatcharr sign-in failed: $e")
+                    form.value = FormState(error = loadError(e) + if (editing != null) str(R.string.set_b_not_saved) else "")
+                    return@launch
+                }
+            }
             val agent = userAgent.trim().ifEmpty { null }
-            if (editing != null) { saveEdit(editing, editing.copy(name = name.trim().ifEmpty { Uri.parse(trimmed).host ?: editing.name }, url = trimmed, username = login, password = pass, userAgent = agent)); return@launch }
+            if (editing != null) { saveEdit(editing, editing.copy(name = name.trim().ifEmpty { Uri.parse(address).host ?: editing.name }, url = address, username = login, password = pass, userAgent = agent)); return@launch }
             val entity = ProviderEntity(
-                name = name.trim().ifEmpty { Uri.parse(trimmed).host!! }, type = type, url = trimmed,
+                name = name.trim().ifEmpty { Uri.parse(address).host!! }, type = type, url = address,
                 username = login, password = pass,
                 userAgent = agent, streamFormat = StreamFormat.TS,
                 epgOverrideUrls = epgUrls.split('\n', ',', ' ').map { it.trim() }.filter { it.isNotEmpty() },
@@ -214,7 +231,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadError(e: Exception) = when (e) {
-        is XtreamAuthException -> str(R.string.set_b_login_failed, e.uiText(getApplication()) ?: "")
+        is XtreamAuthException, is org.imdtv.iptvtv.data.source.DispatcharrException -> str(R.string.set_b_login_failed, e.uiText(getApplication()) ?: "")
         is org.imdtv.iptvtv.data.source.StalkerException -> str(R.string.set_b_portal_login_failed, e.uiText(getApplication()) ?: "")
         else -> str(R.string.set_b_load_failed, e.uiText(getApplication()) ?: e::class.simpleName ?: "")
     }

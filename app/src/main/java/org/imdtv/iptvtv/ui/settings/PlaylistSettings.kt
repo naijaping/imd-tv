@@ -44,7 +44,7 @@ fun updatedLabel(lastSync: Long?): String {
     return stringResource(R.string.set_a_updated_at, (if (t.toLocalDate() == LocalDate.now()) (if (use24Hour) time24 else time) else (if (use24Hour) dayTime24 else dayTime)).format(t).lowercase(Locale.UK))
 }
 
-private fun ProviderEntity.typeLabel() = when (type) { ProviderType.XTREAM -> "Xtream"; ProviderType.M3U -> "M3U"; ProviderType.STALKER -> "Stalker"; ProviderType.PLEX -> "Plex"; ProviderType.JELLYFIN -> "Jellyfin"; ProviderType.STREMIO -> "Stremio" }
+private fun ProviderEntity.typeLabel() = when (type) { ProviderType.XTREAM -> "Xtream"; ProviderType.M3U -> "M3U"; ProviderType.STALKER -> "Stalker"; ProviderType.PLEX -> "Plex"; ProviderType.JELLYFIN -> "Jellyfin"; ProviderType.STREMIO -> "Stremio"; ProviderType.DISPATCHARR -> "Dispatcharr" }
 
 /** The Playlists group: Add playlist, then one row per playlist opening its page. */
 @Composable

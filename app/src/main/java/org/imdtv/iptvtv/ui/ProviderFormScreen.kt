@@ -72,7 +72,8 @@ private fun ProviderForm(vm: AppViewModel, editing: ProviderEntity?) {
     var type by rememberSaveable { mutableStateOf(editing?.type ?: ProviderType.XTREAM) }
     var url by rememberSaveable { mutableStateOf(editing?.url.orEmpty()) }
     var user by rememberSaveable { mutableStateOf(editing?.username.orEmpty()) }
-    var pass by rememberSaveable { mutableStateOf(editing?.password.orEmpty().substringBefore('\n')) }
+    // Dispatcharr saves the XC password, not what was typed: editing, the box starts blank and blank keeps the login.
+    var pass by rememberSaveable { mutableStateOf(if (editing?.type == ProviderType.DISPATCHARR) "" else editing?.password.orEmpty().substringBefore('\n')) }
     // Stalker keeps "serial\ndeviceId\ndeviceId2\nmodel" in the password column (StalkerLogin); the form shows them as separate fields.
     val stalkerEdit = editing?.takeIf { it.type == ProviderType.STALKER }?.let { org.imdtv.iptvtv.data.source.StalkerLogin.from(it.username, it.password) }
     var deviceId by rememberSaveable { mutableStateOf(stalkerEdit?.deviceId.orEmpty()) }
@@ -94,13 +95,16 @@ private fun ProviderForm(vm: AppViewModel, editing: ProviderEntity?) {
         val keep = stringResource(R.string.set_b_phone_blank_keeps)
         fun f(key: String, label: String, value: String, secret: Boolean, vararg t: ProviderType) =
             org.imdtv.iptvtv.data.support.PhoneField(key, if (secret && edit) "$label ($keep)" else label, value, secret, t.map { it.name }.toSet())
-        val x = ProviderType.XTREAM; val m = ProviderType.M3U; val st = ProviderType.STALKER
+        val x = ProviderType.XTREAM; val m = ProviderType.M3U; val st = ProviderType.STALKER; val d = ProviderType.DISPATCHARR
         val fields = listOf(
             f("xurl", stringResource(R.string.set_b_server_url), url.takeIf { type == x }.orEmpty(), false, x),
+            f("durl", stringResource(R.string.set_b_server_url), url.takeIf { type == d }.orEmpty(), false, d),
             f("murl", stringResource(R.string.set_b_playlist_url), url.takeIf { type == m }.orEmpty(), edit, m), // an M3U address often holds the login
             f("surl", stringResource(R.string.set_b_portal_url), url.takeIf { type == st }.orEmpty(), false, st),
             f("user", stringResource(R.string.set_b_username), user.takeIf { type == x }.orEmpty(), false, x),
             f("pass", stringResource(R.string.set_b_password), "", true, x),
+            f("duser", stringResource(R.string.set_b_username), user.takeIf { type == d }.orEmpty(), false, d),
+            f("dpass", stringResource(R.string.set_b_dp_password_or_key), "", true, d),
             f("mac", stringResource(R.string.set_b_mac_form), "", true, st),
             f("serial", stringResource(R.string.set_b_serial_optional), "", true, st),
             f("deviceId", stringResource(R.string.set_b_device_id), "", true, st),
@@ -120,6 +124,7 @@ private fun ProviderForm(vm: AppViewModel, editing: ProviderEntity?) {
                 if (!edit) type = FORM_TYPES.find { it.name == form["type"] } ?: type
                 when (type) {
                     ProviderType.XTREAM -> { url = get("xurl"); user = get("user"); pass = secret("pass", pass) }
+                    ProviderType.DISPATCHARR -> { url = get("durl"); user = get("duser"); pass = secret("dpass", pass) }
                     ProviderType.M3U -> { url = secret("murl", url); epg = get("epg") }
                     ProviderType.PLEX, ProviderType.JELLYFIN, ProviderType.STREMIO -> Unit // added under Media servers, never by this form
                     ProviderType.STALKER -> { url = get("surl"); user = secret("mac", user); pass = secret("serial", pass)
@@ -144,7 +149,7 @@ private fun ProviderForm(vm: AppViewModel, editing: ProviderEntity?) {
                         Button(onClick = { type = t }) { Text((if (t == type) "● " else "○ ") + t.name) }
                     }
                 }
-                FormField(stringResource(when (type) { ProviderType.XTREAM -> R.string.set_b_server_url; ProviderType.M3U -> R.string.set_b_playlist_url; ProviderType.PLEX, ProviderType.JELLYFIN, ProviderType.STREMIO -> R.string.set_b_server_url; ProviderType.STALKER -> R.string.set_b_portal_url }),
+                FormField(stringResource(when (type) { ProviderType.XTREAM, ProviderType.DISPATCHARR -> R.string.set_b_server_url; ProviderType.M3U -> R.string.set_b_playlist_url; ProviderType.PLEX, ProviderType.JELLYFIN, ProviderType.STREMIO -> R.string.set_b_server_url; ProviderType.STALKER -> R.string.set_b_portal_url }),
                     url, KeyboardType.Uri) { url = it }
                 if (type == ProviderType.STALKER) {
                     FormField(stringResource(R.string.set_b_mac_form), user, KeyboardType.Password) { user = it }
@@ -152,10 +157,14 @@ private fun ProviderForm(vm: AppViewModel, editing: ProviderEntity?) {
                     FormField(stringResource(R.string.set_b_device_id), deviceId, KeyboardType.Password) { deviceId = it }
                     FormField(stringResource(R.string.set_b_device_id2), deviceId2, KeyboardType.Password) { deviceId2 = it }
                     FormField(stringResource(R.string.set_b_stb_model), model, KeyboardType.Password) { model = it }
-                } else if (type == ProviderType.XTREAM) {
+                } else if (type.xtream) {
                     // The password keyboard has the number row many providers' usernames need.
                     FormField(stringResource(R.string.set_b_username), user, KeyboardType.Password) { user = it }
-                    FormField(stringResource(R.string.set_b_password), pass, KeyboardType.Password, secret = true) { pass = it }
+                    FormField(stringResource(when {
+                        type == ProviderType.XTREAM -> R.string.set_b_password
+                        editing != null -> R.string.set_b_dp_password_keep
+                        else -> R.string.set_b_dp_password_or_key
+                    }), pass, KeyboardType.Password, secret = true) { pass = it }
                 } else if (editing == null) {
                     FormField(stringResource(R.string.set_b_epg_urls), epg, KeyboardType.Uri) { epg = it }
                 }
@@ -256,4 +265,4 @@ fun Field(
 }
 
 /** The types this form adds (Plex and Jellyfin are added under Settings › Media servers). */
-private val FORM_TYPES = listOf(ProviderType.XTREAM, ProviderType.M3U, ProviderType.STALKER)
+private val FORM_TYPES = listOf(ProviderType.XTREAM, ProviderType.M3U, ProviderType.STALKER, ProviderType.DISPATCHARR)

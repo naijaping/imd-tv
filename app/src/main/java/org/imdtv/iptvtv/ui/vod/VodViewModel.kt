@@ -206,7 +206,7 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val p = providerOf(item) ?: return@launch
             // M3U has no movie details, and asking would download and hold the whole playlist; Stalker has no detail call.
-            if (item.kind == Kind.MOVIE && p.type != ProviderType.XTREAM && !p.type.mediaServer) return@launch
+            if (item.kind == Kind.MOVIE && !p.type.xtream && !p.type.mediaServer) return@launch
             runCatching {
                 if (item.kind == Kind.MOVIE) source(p).movieDetail(item.remoteId).let {
                     VodDetail(it.backdrop, it.plot, it.genre, it.director, it.cast, it.durationSecs, height = it.height)

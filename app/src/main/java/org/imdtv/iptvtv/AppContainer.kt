@@ -42,13 +42,15 @@ class AppContainer(context: Context) {
             .build()
     }
     val json: Json = xtreamJson()
+    val dispatcharr by lazy { org.imdtv.iptvtv.data.source.DispatcharrAuth(http, json) }
     val prefs: DataStore<Preferences> by lazy {
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") }
     }
 
     /** A fresh source per call: M3U caches its parse per instance, i.e. per sync. */
     fun sourceFor(p: ProviderEntity): PlaylistSource = when (p.type) {
-        ProviderType.XTREAM -> XtreamSource(
+        // Dispatcharr: its Xtream Codes API, with the XC password saved when the playlist was added.
+        ProviderType.XTREAM, ProviderType.DISPATCHARR -> XtreamSource(
             p.url, p.username.orEmpty(), p.password.orEmpty(), p.streamFormat, http, json, p.userAgent,
         )
         ProviderType.M3U -> M3uSource(p.url, p.epgOverrideUrls, http, p.userAgent)

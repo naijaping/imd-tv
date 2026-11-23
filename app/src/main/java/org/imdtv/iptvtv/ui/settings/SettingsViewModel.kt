@@ -439,7 +439,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     /** Already on this box with a login: restore keeps that login instead of asking again. */
     fun hasSavedLogin(p: BPlaylist) = providers.value.any {
         it.type.name == p.type && when (it.type) {
-            org.imdtv.iptvtv.data.db.ProviderType.XTREAM, org.imdtv.iptvtv.data.db.ProviderType.STALKER -> it.url == p.url && !it.username.isNullOrBlank()
+            org.imdtv.iptvtv.data.db.ProviderType.XTREAM, org.imdtv.iptvtv.data.db.ProviderType.STALKER, org.imdtv.iptvtv.data.db.ProviderType.DISPATCHARR -> it.url == p.url && !it.username.isNullOrBlank()
             org.imdtv.iptvtv.data.db.ProviderType.M3U -> org.imdtv.iptvtv.data.security.m3uBackupUrl(it.url) == p.url // same playlist, login in its address
             org.imdtv.iptvtv.data.db.ProviderType.PLEX, org.imdtv.iptvtv.data.db.ProviderType.JELLYFIN, org.imdtv.iptvtv.data.db.ProviderType.STREMIO -> it.url == p.url && !it.password.isNullOrBlank()
         }
@@ -461,7 +461,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 if (needsLogin(pl) && login == null && !hasSavedLogin(pl)) return@forEachIndexed
                 backupStatus.value = str(R.string.set_b_restoring, pl.name)
                 try {
-                    val r = c.backup.restorePlaylist(pl, login?.first, login?.second) { backupStatus.value = str(R.string.set_b_playlist_progress, pl.name, it) }
+                    // Dispatcharr: the login typed is its own; the playlist keeps the XC login it gives.
+                    val xc = if (login != null && pl.type == org.imdtv.iptvtv.data.db.ProviderType.DISPATCHARR.name)
+                        c.dispatcharr.xcLogin(pl.url, login.first, login.second).let { it.username to it.password } else login
+                    val r = c.backup.restorePlaylist(pl, xc?.first, xc?.second) { backupStatus.value = str(R.string.set_b_playlist_progress, pl.name, it) }
                     c.db.providerDao().all().find { it.url == pl.url && it.type.name == pl.type }?.let { c.epgMatcher.rematch(it.id) }
                     applied += r.applied; skipped += r.skipped
                 } catch (e: Exception) {
@@ -486,4 +489,5 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
 /** Xtream and Stalker (MAC) always; M3U when its backed-up address had its login taken out. */
 fun needsLogin(p: BPlaylist) = p.type == org.imdtv.iptvtv.data.db.ProviderType.XTREAM.name || p.type == org.imdtv.iptvtv.data.db.ProviderType.STALKER.name ||
+    p.type == org.imdtv.iptvtv.data.db.ProviderType.DISPATCHARR.name ||
     (p.type == org.imdtv.iptvtv.data.db.ProviderType.M3U.name && org.imdtv.iptvtv.data.security.hasLoginPlaceholders(p.url))

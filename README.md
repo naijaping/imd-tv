@@ -25,7 +25,7 @@ Free and open source, with no ads, accounts or tracking.
 
 <p align="center"><img src="site/img/guide-logos.webp" width="100%" alt="The TV guide in Celestial Glass: Blaze playing in the corner, channel logos beside each name"></p>
 
-IMD TV plays your own IPTV playlist (Xtream login, M3U link or Stalker portal), with your Plex, Jellyfin and Stremio
+IMD TV plays your own IPTV playlist (Xtream login, M3U link, Stalker portal or Dispatcharr server), with your Plex, Jellyfin and Stremio
 libraries alongside. It exists because few free IPTV apps offer a complete feature set without a licence, a
 subscription or a paywall, and most open-source ones sit outside Android TV.
 
@@ -169,7 +169,7 @@ Six themes, all with the same fast guide:
 - Sort movies and series by the playlist's order, A–Z or recently added
 - Playlists and media servers update in the background, every 6, 12, 24 or 48 hours
 - Channel and Page Up/Down move a whole screen at a time; hold Back in the guide for the other Back action, or go full screen on its own after a few minutes
-- The ability to add several playlists, not just one. Choose between Xtream logins, M3U links and Stalker portals (beta), give each your own name, and use several at once: their categories sit together in one list
+- The ability to add several playlists, not just one. Choose between Xtream logins, M3U links, Stalker portals (beta) and Dispatcharr servers (sign in with your Dispatcharr login or API key), give each your own name, and use several at once: their categories sit together in one list
 - Merge duplicate channels: HD, 4K and RAW copies of a channel become one, playing the best version – within each category or across them, and only for the playlists you choose
 - Catch-up TV: watch programmes that have already aired, on channels where your provider keeps them, or restart the one that's on
 - English, French, Spanish, Polish, Dutch, German, Italian, Portuguese, Turkish, Romanian, Greek, Swedish and Albanian
