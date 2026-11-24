@@ -97,7 +97,7 @@ fun PlaylistPage(
         SwitchRow(stringResource(R.string.set_a_use_playlist), stringResource(when { !p.enabled -> R.string.set_a_use_playlist_off; activeId == id -> R.string.set_a_use_playlist_on; else -> R.string.set_a_use_playlist_listed }),
             p.enabled, if (plex) Modifier.focusRequester(first) else Modifier) { on ->
             if (on || activeId != id) vm.setEnabled(id, on)
-            else providers.firstOrNull { it.id != id && it.enabled }?.let { vm.setEnabled(id, false); onUse(it.id) }
+            else providers.filter { it.id != id && it.enabled }.minByOrNull { it.type.mediaServer }?.let { vm.setEnabled(id, false); onUse(it.id) }
         }
         SettingRow(stringResource(R.string.set_a_update_playlist), update[id] ?: updatedLabel(p.lastSync), null) { vm.updatePlaylist(id) }
         listOf(org.imdtv.iptvtv.data.model.Kind.LIVE to R.string.set_a_kind_live, org.imdtv.iptvtv.data.model.Kind.MOVIE to R.string.set_a_kind_movies, org.imdtv.iptvtv.data.model.Kind.SERIES to R.string.set_a_kind_series).filter { !plex || it.first != org.imdtv.iptvtv.data.model.Kind.LIVE }.forEach { (kind, labelRes) ->

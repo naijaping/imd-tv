@@ -300,6 +300,34 @@ class BackupTest {
         assertEquals(a.snapshot(p), b.snapshot(q))
     }
 
+    /** #22: a follower must hide, rename and merge channels as the master does, and drop its own such edits. */
+    @Test fun mirrorCarriesPerChannelEditsAndMergeSettings() = runTest {
+        val a = env()
+        val p = a.providers.add(xtream()).also { a.providers.syncNow(it) }
+        val ach = a.db.channelDao().byProvider(p).associateBy { it.remoteId }
+        a.db.channelDao().setHidden(ach.getValue("2").id, true)
+        a.db.channelDao().setCustomName(ach.getValue("1").id, "BBC 1")
+        a.db.channelDao().setEpgOffset(ach.getValue("1").id, 30)
+        org.imdtv.iptvtv.data.repo.ChannelMerge.merge(a.db, ach.getValue("3"), ach.getValue("1"))
+        a.settings.update { it.copy(mergeChannels = !it.mergeChannels, removeNameSymbols = !it.removeNameSymbols) }
+        val snap = org.imdtv.iptvtv.data.sync.decodeSnapshot(org.imdtv.iptvtv.data.sync.encodeSnapshot(a.backup.syncSnapshot()))
+
+        val b = env()
+        val q = b.providers.add(xtream()).also { b.providers.syncNow(it) }
+        b.db.channelDao().byProvider(q).single { it.remoteId == "3" }.let { b.db.channelDao().setHidden(it.id, true); b.db.channelDao().setCustomName(it.id, "Mine") }
+        b.backup.mirror(snap) {}
+
+        val bch = b.db.channelDao().byProvider(q).associateBy { it.remoteId }
+        assertEquals(listOf("2"), bch.values.filter { it.hidden }.map { it.remoteId })
+        assertEquals("BBC 1", bch.getValue("1").customName)
+        assertEquals(30, bch.getValue("1").epgOffsetMinutes)
+        assertEquals(null, bch.getValue("3").customName)
+        assertEquals(bch.getValue("1").id, bch.getValue("3").mergedInto)
+        assertTrue(bch.getValue("1").mergeHead)
+        val sa = a.settings.settings.first(); val sb = b.settings.settings.first()
+        assertEquals(sa.mergeChannels to sa.removeNameSymbols, sb.mergeChannels to sb.removeNameSymbols)
+    }
+
     @Test fun mirrorAddsNewPlaylistWithItsLogin() = runTest {
         val a = env()
         a.customise()

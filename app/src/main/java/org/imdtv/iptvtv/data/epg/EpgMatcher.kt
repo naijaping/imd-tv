@@ -78,6 +78,8 @@ class EpgMatcher(
             val candidates = sequence {
                 for (i in ids) byIdIn(c, i)?.let { yield(it) }
                 for (n in names) byName(c, keys, n)?.let { yield(it) }
+                // Last: a one-letter spelling difference ("Sky Cinema Premier" / "Premiere", #19), only after every exact key.
+                keys.compact?.let { k -> for (n in names) n.near.find(k)?.let { yield(EpgLinkEntity(c.id, n.sourceId, it, manual = false)) } }
             }
             var first: EpgLinkEntity? = null
             for (l in candidates) {
@@ -111,6 +113,8 @@ class EpgMatcher(
         val ruled = HashMap<String, MutableList<Candidate>>()
         /** Last resort: number words as digits, tags and spacing ignored (open-source files name channels differently). */
         val compact = HashMap<String, String>()
+        /** Built on first use: most channels match before it. */
+        val near by lazy { org.imdtv.iptvtv.data.logos.NearKeys(compact) }
     }
 
     /**

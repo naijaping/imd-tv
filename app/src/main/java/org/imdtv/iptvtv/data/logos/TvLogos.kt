@@ -60,11 +60,18 @@ class TvLogoIndex(paths: List<String>) {
         for (f in folders) {
             val hits = byFolderKey[f]?.get(compact).orEmpty()
             if (hits.isEmpty()) continue
-            return (hits.firstOrNull { it.quality == key.quality } ?: hits.firstOrNull { it.quality == null }
-                ?: hits.minBy { it.path }).path
+            return pick(hits, key)
         }
+        // A one-letter spelling difference ("Scifi"/"Syfi", "Premier"/"Premiere", #24), only when no folder has the key.
+        for (f in folders) near(f)?.find(compact)?.let { return pick(it, key) }
         return null
     }
+
+    private fun pick(hits: List<Entry>, key: LogoKey) =
+        (hits.firstOrNull { it.quality == key.quality } ?: hits.firstOrNull { it.quality == null } ?: hits.minBy { it.path }).path
+
+    private val nearByFolder = java.util.concurrent.ConcurrentHashMap<String, NearKeys<List<Entry>>>()
+    private fun near(folder: String) = byFolderKey[folder]?.let { m -> nearByFolder.computeIfAbsent(folder) { NearKeys(m) } }
 
     /** For "Change logo…": the match, the key in [folders], the key anywhere, then files anywhere with every word of the key. */
     fun candidates(key: LogoKey, folders: List<String>, limit: Int = 8): List<String> {

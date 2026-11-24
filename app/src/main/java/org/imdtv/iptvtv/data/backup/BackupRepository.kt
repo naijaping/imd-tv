@@ -55,8 +55,10 @@ class BackupRepository(
             ids.mapNotNull { remote[it] }.map { BFavourite(kind.name, it) }
         }
         val liveCats = db.categoryDao().allKinds(p.id).filter { it.kind == Kind.LIVE }.associate { it.id to it.remoteId }
-        val channelNumbers = db.channelDao().byProvider(p.id).mapNotNull { c -> c.customNumber?.let { BChannelNumber(c.remoteId, it) } }
-        val channelOrder = db.channelDao().byProvider(p.id).filter { it.sortOrder != null && it.categoryId != null }.groupBy { it.categoryId!! }
+        val chans = db.channelDao().byProvider(p.id)
+        val remoteOf = chans.associate { it.id to it.remoteId }
+        val channelNumbers = chans.mapNotNull { c -> c.customNumber?.let { BChannelNumber(c.remoteId, it) } }
+        val channelOrder = chans.filter { it.sortOrder != null && it.categoryId != null }.groupBy { it.categoryId!! }
             .mapNotNull { (cid, chs) -> liveCats[cid]?.let { BChannelOrder(it, chs.sortedBy { c -> c.sortOrder }.map { c -> c.remoteId }) } }
         return BPlaylist(
             // Never a login in a backup: an M3U address carrying one keeps placeholders, filled in on restore.
@@ -64,7 +66,10 @@ class BackupRepository(
             nameStrip = p.nameStrip, epgSources = sources,
             categories = db.categoryDao().allKinds(p.id).map { BCategory(it.kind.name, it.remoteId, it.hidden, it.sortOrder, it.pinned, it.sortBy.name, it.parentalLock) },
             groups = db.customGroupDao().observe(p.id).first().map { BGroup(it.name, it.sortOrder, db.customGroupDao().memberRemoteIds(it.id), it.placement.name, it.sortBy.name) },
-            favourites = favourites, categoryStrip = p.categoryStrip, channelOrder = channelOrder, contentOff = p.contentOff, enabled = p.enabled, channelNumbers = channelNumbers, lockedChannels = db.channelDao().byProvider(p.id).filter { it.parentalLock }.map { it.remoteId },
+            favourites = favourites, categoryStrip = p.categoryStrip, channelOrder = channelOrder, contentOff = p.contentOff, enabled = p.enabled, channelNumbers = channelNumbers, lockedChannels = chans.filter { it.parentalLock }.map { it.remoteId },
+            hiddenChannels = chans.filter { it.hidden }.map { it.remoteId },
+            channelEdits = chans.filter { it.customName != null || it.epgOffsetMinutes != null }.map { BChannelEdit(it.remoteId, it.customName, it.epgOffsetMinutes) },
+            merges = chans.filter { !it.mergedAuto }.mapNotNull { c -> c.mergedInto?.let(remoteOf::get)?.let { BMerge(c.remoteId, it) } }, mergeOn = p.mergeOn,
             progress = db.progressDao().all(p.id).let { rows ->
                 val movies = rows.filter { it.kind == Kind.MOVIE }.map { it.itemId }.distinct().chunked(900).flatMap { db.movieDao().byIds(it) }.associate { it.id to it.remoteId }
                 val series = rows.filter { it.kind == Kind.SERIES }.map { it.itemId }.distinct().chunked(900).flatMap { db.seriesDao().byIds(it) }.associate { it.id to it.remoteId }
@@ -152,6 +157,7 @@ class BackupRepository(
                 db.favouriteDao().deleteForProvider(id)
                 db.customGroupDao().deleteForProvider(id)
                 db.channelDao().clearSortOrders(id)
+                db.channelDao().clearUserEdits(id) // hidden, renamed, numbers, offsets, locks, hand merges: the master's replace them
             }
             applyUserData(id, b)
         }
@@ -194,6 +200,17 @@ class BackupRepository(
         }
         b.channelNumbers.forEach { n -> channels[n.channel]?.let { db.channelDao().setCustomNumber(it, n.number); applied++ } ?: skipped++ }
         b.lockedChannels.forEach { r -> channels[r]?.let { db.channelDao().setParentalLock(it, true); applied++ } ?: skipped++ }
+        channels.let { m -> b.hiddenChannels.mapNotNull(m::get) }.chunked(900).forEach { db.channelDao().setHiddenForIds(it, true) }
+        b.hiddenChannels.forEach { if (it in channels) applied++ else skipped++ }
+        b.channelEdits.forEach { e -> channels[e.channel]?.let { cid ->
+            e.name?.let { db.channelDao().setCustomName(cid, it) }; e.offsetMinutes?.let { db.channelDao().setEpgOffset(cid, it) }; applied++ } ?: skipped++ }
+        b.merges.groupBy { it.head }.forEach { (head, ms) ->
+            val into = channels[head]
+            val members = ms.mapNotNull { channels[it.member] }
+            if (into == null) skipped += ms.size else { db.channelDao().setMergedInto(members, into, false); applied += members.size; skipped += ms.size - members.size }
+        }
+        db.channelDao().refreshMergeHeads(id) // merges above, or hand merges a mirror cleared
+        db.providerDao().setMergeOn(id, b.mergeOn)
 
         val groups = db.customGroupDao().observe(id).first().associateBy { it.name }
         b.groups.sortedBy { it.sortOrder }.forEach { g ->
@@ -236,5 +253,11 @@ class BackupRepository(
         return RestoreResult(applied, skipped)
     }
 
-    suspend fun restoreSettings(s: BSettings) = settings.update { s.toAppSettings(it.lastLiveChannelId).copy(backupFolder = it.backupFolder, recordUsbPath = it.recordUsbPath, smbPassword = it.smbPassword) }
+    suspend fun restoreSettings(s: BSettings) {
+        settings.update { s.toAppSettings(it.lastLiveChannelId).copy(backupFolder = it.backupFolder, recordUsbPath = it.recordUsbPath, smbPassword = it.smbPassword) }
+        // Merging follows the restored settings; a mirror skips the playlist sync that would have run it (#22).
+        val m = settings.settings.first()
+        val opts = org.imdtv.iptvtv.data.repo.MergeOptions(m.mergeChannels, m.mergeAcross, m.mergeBy == org.imdtv.iptvtv.data.settings.MergeBy.RESOLUTION)
+        db.providerDao().ids().forEach { org.imdtv.iptvtv.data.repo.ChannelMerge.applyAuto(db, it, opts) }
+    }
 }

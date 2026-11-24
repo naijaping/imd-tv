@@ -51,4 +51,18 @@ class LogoKeyTest {
         assertEquals("5usa", logoKey("5USA")?.key) // a country inside a word stays
         assertEquals("uk", logoKey("UK")?.key) // nothing else left: keep it
     }
+
+    @Test fun nearKeysOneLetterOnly() {
+        val n = NearKeys(mapOf("skycinemapremiere" to 1, "skysportsnews" to 2, "skysports1" to 3, "skysports2" to 4, "channel4" to 5, "sportsone" to 6, "sportstwo" to 7))
+        assertEquals(1, n.find("skycinemapremier")) // a letter dropped
+        assertEquals(2, n.find("skysportnews")) // a letter dropped in the middle
+        assertEquals(1, n.find("skycinemapremiire")) // a letter changed
+        assertNull(n.find("skysports3")) // a digit never counts
+        assertNull(n.find("channel5")) // nor here
+        assertNull(n.find("sky")) // too short
+        assertNull(n.find("skycinemapremieres1")) // two apart
+        assertEquals(null, NearKeys(mapOf("sportsone" to 1, "sportsona" to 2)).find("sportsonx")) // two keys equally near: none
+    }
+
+    @Test fun ampersandIsAnd() = assertEquals(logoKey("Sky Cinema Sci-Fi and Horror"), logoKey("UK: Sky Cinema Sci-Fi & Horror"))
 }

@@ -35,6 +35,13 @@ class EpgRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWo
         var attempted = 0
         var failed = 0
         for (p in c.db.providerDao().all()) {
+            if (p.type.mediaServer) {
+                // No live channels. 0.7.0 could make Plex active, which gave it open-source guide files to import: drop them.
+                c.db.epgDao().sources(p.id).forEach { s ->
+                    c.db.programmeDao().deleteForSource(s.id); c.db.epgDao().deleteLinksForSource(s.id); c.db.epgDao().deleteSource(s.id)
+                }
+                continue
+            }
             // epgshare01 files follow the active playlist's shown countries; other playlists keep theirs as they are.
             if (GuideKind.OPEN_SOURCE in mode && p.id == active) {
                 runCatching { c.epgShare.sync(p.id) }.onFailure { e ->

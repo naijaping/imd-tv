@@ -239,6 +239,15 @@ class EpgMatcherTest {
         assertEquals("BBC.Two.HD.uk", link(bbc2)!!.xmltvId); assertEquals("ITV1.HD.uk", link(itv)!!.xmltvId); assertNull(link(ss1))
     }
 
+    /** #19: the playlist's "Sky Cinema Premier" finds the guide's "Sky Cinema Premiere"; a digit apart never does. */
+    @Test fun oneLetterSpellingMatchesLast() = runTest {
+        val s = source(0)
+        xmltv(s, "SkyPremiere.uk", "Sky Cinema Premiere HD"); xmltv(s, "SkySports1.uk", "Sky Sports 1")
+        val prem = channel("1", "UK: Sky Cinema Premier"); val ss2 = channel("2", "UK: Sky Sports 2")
+        EpgMatcher(db).rematch(p, borrow = false)
+        assertEquals("SkyPremiere.uk", link(prem)!!.xmltvId); assertNull(link(ss2))
+    }
+
     private suspend fun programme(sourceId: Long, xmltvId: String, start: Long, stop: Long) =
         db.programmeDao().insertAll(listOf(org.imdtv.iptvtv.data.db.ProgrammeEntity(sourceId = sourceId,
             epgChannelKey = org.imdtv.iptvtv.data.db.ProgrammeEntity.key(sourceId, xmltvId), start = start, stop = stop,

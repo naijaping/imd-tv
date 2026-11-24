@@ -219,12 +219,21 @@ class PlayerManager(private val context: Context) {
     /** [login] fills the Xtream placeholders in [url] (saved links hold no login); [url] itself stays the key for comparisons. */
     /** [startMs]: a movie/episode starts there (resume), applied when the stream loads, also after the guard or a portal link. */
     /** [fallbackUrl]: played instead when [url] fails (catch-up's second link form), without the usual retries first. */
+    /** [parallel]: a Plex/Jellyfin file, fetched over several connections (ParallelDataSource); never an IPTV provider. */
     fun play(url: String, userAgent: String?, login: Login? = null, vod: Boolean = false, drm: Drm? = null, startMs: Long = 0,
-             fallbackUrl: String? = null) {
+             fallbackUrl: String? = null, parallel: Boolean = false) {
         fallback = fallbackUrl
+        this.parallel = parallel
         play(url, userAgent, login, vod, drm, guarded = true, startMs)
     }
     private var fallback: String? = null
+    private var parallel = false
+    /** A quarter of the RAM free now, 32–256 MiB: ~1 min of a 33 Mbit/s 4K file on a 2 GB box (#32). */
+    private val readAheadBytes: Long get() {
+        val m = android.app.ActivityManager.MemoryInfo()
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(m)
+        return (m.availMem / 4).coerceIn(32L shl 20, 256L shl 20)
+    }
 
     /** Asked before a provider stream starts (a recording may hold the login's only connection); true = not now. It
      *  gets a retry that plays without asking again. */
@@ -300,7 +309,11 @@ class PlayerManager(private val context: Context) {
         }
         // A live .ts stream reconnects by itself when the provider ends or stalls the connection (LiveTsDataSource).
         val liveTs = !vod && spec == null && android.net.Uri.parse(req.url).lastPathSegment?.endsWith(".ts", ignoreCase = true) == true
-        val upstream = if (liveTs) androidx.media3.datasource.DataSource.Factory { LiveTsDataSource(http.createDataSource()) } else http
+        val upstream = when {
+            liveTs -> androidx.media3.datasource.DataSource.Factory { LiveTsDataSource(http.createDataSource()) }
+            parallel && vod && spec == null && req.url.startsWith("http") -> androidx.media3.datasource.DataSource.Factory { ParallelDataSource(http, aheadBytes = readAheadBytes) }
+            else -> http
+        }
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context, upstream))
         spec?.let { factory.setDrmSessionManagerProvider(drmSessions(it, http)) }
         // A stream format with no module in the app (e.g. Smooth Streaming) throws here: report it, don't crash.

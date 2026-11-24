@@ -103,7 +103,7 @@ class RecordingService : Service() {
             1 -> getString(R.string.vod_rec_notification_one, titles[0])
             else -> resources.getQuantityString(R.plurals.vod_rec_notification_many, titles.size, titles.size)
         }
-        val n = Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_tab_recordings).setContentTitle(text).setOngoing(true).build()
+        @Suppress("DEPRECATION") val n = (if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, CHANNEL) else Notification.Builder(this)).setSmallIcon(R.drawable.ic_tab_recordings).setContentTitle(text).setOngoing(true).build()
         if (Build.VERSION.SDK_INT >= 34) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE) else startForeground(1, n)
     }
 
@@ -119,8 +119,9 @@ class RecordingService : Service() {
         private const val EXTRA_ID = "id"
         private const val CHANNEL = "recording"
 
-        fun start(context: Context, id: Long) = context.startForegroundService(
-            Intent(context, RecordingService::class.java).setAction(ACTION_START).putExtra(EXTRA_ID, id))
+        fun start(context: Context, id: Long) = Intent(context, RecordingService::class.java).setAction(ACTION_START).putExtra(EXTRA_ID, id).let {
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(it) else context.startService(it) // Fire OS 6 = Android 7.1
+        }
 
         fun stop(context: Context, id: Long) = context.startService(
             Intent(context, RecordingService::class.java).setAction(ACTION_STOP).putExtra(EXTRA_ID, id))

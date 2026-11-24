@@ -109,6 +109,17 @@ class ProviderRepositoryTest {
         assertEquals(b, repo.activeProviderId.first())
     }
 
+    /** 0.7.0: the Movies rail made Plex active, which emptied Live TV; a media server is active only when it's alone. */
+    @Test
+    fun mediaServerIsNeverActiveBesideAnIptvPlaylist() = runTest {
+        val repo = repo()
+        val plex = repo.add(provider("Aplex", "http://e/p.xml").copy(type = ProviderType.PLEX))
+        assertEquals(plex, repo.activeProviderId.first())
+        val tv = repo.add(provider("b", "http://e/b.xml"))
+        repo.setActive(plex)
+        assertEquals(tv, repo.activeProviderId.first())
+    }
+
     @Test
     fun deletingLastProviderClearsActive() = runTest {
         val repo = repo()

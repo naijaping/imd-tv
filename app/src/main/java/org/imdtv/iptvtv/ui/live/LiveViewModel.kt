@@ -4,9 +4,8 @@ import org.imdtv.iptvtv.R
 
 import org.imdtv.iptvtv.data.db.EpgChannelEntity
 import org.imdtv.iptvtv.data.epg.SourceChannel
-import org.imdtv.iptvtv.data.epg.guideKindOf
+import org.imdtv.iptvtv.data.db.ProgrammeEntity
 import org.imdtv.iptvtv.data.epg.sourceChannelChoices
-import org.imdtv.iptvtv.data.settings.GuideKind
 import org.imdtv.iptvtv.data.catalogue.displayName
 import org.imdtv.iptvtv.data.db.login
 
@@ -604,15 +603,21 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     // Use guide from… (spec §5.4)
     /** Donors with their category name, for "<name> · <category>". */
-    /** Playlist channels with a guide, then (Batch 3b) channels of Your EPG sources, labelled by source. */
+    /** Playlist channels with a guide, then channels of the playlist's EPG sources, labelled by source. */
     suspend fun donors(ch: ChannelEntity, query: String): List<GuideChoice> {
         // The channel list and its same-name siblings (~3 s on a TV box) are worked out once per channel, not per search.
         val pool = donorPool?.takeIf { it.channelId == ch.id } ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            val list = c.db.channelDao().withGuide(ch.providerId)
-            val own = c.providerRepository.playlistGuideUrls(ch.providerId)
-            val mine = c.db.epgDao().sources(ch.providerId).filter { guideKindOf(it, own) == GuideKind.USER }
+            // Only guides with programmes still to come, and not the one this channel already has: offering a linked channel
+            // whose guide was empty (often the very same link) meant picking it changed nothing (#19).
+            val live = c.db.programmeDao().liveKeys(System.currentTimeMillis()).toHashSet()
+            val keys = c.db.epgDao().links(ch.providerId).associate { it.channelId to ProgrammeEntity.key(it.sourceId, it.xmltvId) }
+            val useful = { k: String? -> k != null && k != keys[ch.id] && k in live }
+            val list = c.db.channelDao().withGuide(ch.providerId).filter { useful(keys[it.id]) }
+            // Every guide of this playlist (its own, open-source, yours), so a name the matcher missed can be searched (#19).
+            val sources = c.db.epgDao().sources(ch.providerId)
             DonorPool(ch.id, list, guideSiblings(ch, list), c.db.categoryDao().allKinds(ch.providerId).associate { it.id to it.name },
-                mine.flatMap { c.db.epgDao().channels(it.id) }, mine.associate { it.id to org.imdtv.iptvtv.ui.settings.sourceLabel(it) })
+                sources.flatMap { c.db.epgDao().channels(it.id) }.filter { useful(ProgrammeEntity.key(it.sourceId, it.xmltvId)) },
+                sources.associate { it.id to org.imdtv.iptvtv.ui.settings.sourceLabel(it) })
         }.also { donorPool = it }
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             guideDonors(ch, pool.list, query, siblings = pool.siblings).map { GuideChoice.Channel(it, it.categoryId?.let(pool.cats::get)) } +

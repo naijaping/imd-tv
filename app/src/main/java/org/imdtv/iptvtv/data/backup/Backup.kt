@@ -53,7 +53,22 @@ data class BPlaylist(
     val channelNumbers: List<BChannelNumber> = emptyList(),
     /** Channels with Parental Lock on, by remote id (older backups have none). */
     val lockedChannels: List<String> = emptyList(),
+    /** Channels hidden one by one, by remote id (older backups have none; a sync follower kept showing them, #22). */
+    val hiddenChannels: List<String> = emptyList(),
+    /** Renamed channels and channels with their own guide offset (older backups have none). */
+    val channelEdits: List<BChannelEdit> = emptyList(),
+    /** Channels merged by hand (older backups have none). */
+    val merges: List<BMerge> = emptyList(),
+    /** Merge channels for this playlist (older backups: on). */
+    val mergeOn: Boolean = true,
 )
+
+@Serializable
+data class BChannelEdit(val channel: String, val name: String? = null, val offsetMinutes: Int? = null)
+
+/** [member] plays through [head]; both remote ids. */
+@Serializable
+data class BMerge(val member: String, val head: String)
 
 @Serializable
 data class BChannelNumber(val channel: String, val number: Int)
@@ -156,6 +171,11 @@ data class BSettings(
     val themeDark: Boolean = AppSettings().themeDark,
     /** The guide order with "Your EPG sources"; absent in older backups, whose [guideOrder] then gets it added. */
     val guideKinds: List<String>? = null,
+    // Absent in older backups. Merging changes which channels a list shows, so a follower without them didn't match (#22).
+    val removeNameSymbols: Boolean = AppSettings().removeNameSymbols,
+    val mergeChannels: Boolean = AppSettings().mergeChannels,
+    val mergeAcross: Boolean = AppSettings().mergeAcross,
+    val mergeBy: String = AppSettings().mergeBy.name,
 ) {
     fun toAppSettings(lastLiveChannelId: Long?): AppSettings {
         val d = AppSettings()
@@ -182,6 +202,8 @@ data class BSettings(
             catchUpOn = catchUpOn, holdBackOther = holdBackOther, guideTimeoutMin = guideTimeoutMin, favouritesSortBy = favouritesSortBy?.let { n -> org.imdtv.iptvtv.data.db.SortBy.entries.find { it.name == n } },
             headerSize = HeaderSize.entries.find { it.name == headerSize } ?: d.headerSize, previewFade = previewFade, themeDark = themeDark,
             showLiveIndicator = showLiveIndicator, heroLogoScale = heroLogoScale, heroTitleScale = heroTitleScale, brandLogoScale = brandLogoScale,
+            removeNameSymbols = removeNameSymbols, mergeChannels = mergeChannels, mergeAcross = mergeAcross,
+            mergeBy = org.imdtv.iptvtv.data.settings.MergeBy.entries.find { it.name == mergeBy } ?: d.mergeBy,
             startOnBoot = startOnBoot,
             epgUpdateIntervalHours = epgUpdateIntervalHours,
             epgUpdateOnStart = epgUpdateOnStart,
@@ -221,6 +243,7 @@ data class BSettings(
             zapLeftRight = s.zapLeftRight, backToFullScreen = s.backToFullScreen, showChannelNumbers = s.showChannelNumbers, clock24h = s.clock24h,
             playerClockMode = s.playerClock.name, showDate = s.showDate, themeLooks = s.themeLooks, guidesOff = s.guidesOff.toList(), liveSubtitlesOn = s.liveSubtitlesOn, showRecent = s.showRecent, videoAspect = s.videoAspect.name, vodTwoRows = s.vodTwoRows, titleSize = s.titleSize.name, vodTitleSize = s.vodTitleSize.name, epgTextSize = s.epgTextSize.name, guideDisplay = s.guideDisplay.name, vodSort = s.vodSort.name, parentalOn = s.parentalOn, parentalPin = s.parentalPin, parentalWord = s.parentalWord, ageLimit = s.ageLimit.name, unlockFor = s.unlockFor.name, catchUpOn = s.catchUpOn, holdBackOther = s.holdBackOther, guideTimeoutMin = s.guideTimeoutMin, favouritesSortBy = s.favouritesSortBy?.name,
             headerSize = s.headerSize.name, previewFade = s.previewFade, showLiveIndicator = s.showLiveIndicator, heroLogoScale = s.heroLogoScale, heroTitleScale = s.heroTitleScale, brandLogoScale = s.brandLogoScale, themeDark = s.themeDark, guideKinds = s.guideOrder.map { it.name },
+            removeNameSymbols = s.removeNameSymbols, mergeChannels = s.mergeChannels, mergeAcross = s.mergeAcross, mergeBy = s.mergeBy.name,
             recordingOn = s.recordingOn, recordTo = s.recordTo.name, startEarlyMin = s.startEarlyMin, endLateMin = s.endLateMin,
             keepAwake = s.keepAwake, smbServer = s.smbServer, smbShare = s.smbShare, smbFolder = s.smbFolder, smbUser = s.smbUser, playlistUpdateHours = s.playlistUpdateHours,
         )

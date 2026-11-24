@@ -28,7 +28,7 @@ object LogCollector {
                 old.forEach { it.delete() }
             }
             ProcessBuilder("logcat", "-v", "threadtime", "--pid=${Process.myPid()}", "-f", File(d, "app.log").path, "-r", "512", "-n", "1")
-                .redirectErrorStream(true).redirectOutput(File("/dev/null")).start()
+                .redirectErrorStream(true).apply { if (android.os.Build.VERSION.SDK_INT >= 26) redirectOutput(File("/dev/null")) }.start()
         } catch (e: Exception) {
             Log.w(TAG, "Log capture not started", e)
         }

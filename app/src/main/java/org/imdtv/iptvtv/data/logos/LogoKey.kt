@@ -51,7 +51,43 @@ fun logoKey(name: String, dropCountry: Boolean = true): LogoKey? {
     }
     dropTail()
     if (dropCountry) COUNTRY_TAIL.find(s)?.let { s = s.substring(0, it.range.first); dropTail() } // "… UK HD" and "… HD UK"
-    val key = digitsKey(Normalizer.normalize(s.replace(PLUS_ONE, " plus "), Normalizer.Form.NFD).replace(MARKS, "").lowercase()
+    // "&" as "and": tv-logos spells it out ("sky-cinema-sci-fi-and-horror"), playlists mostly don't (#24).
+    val key = digitsKey(Normalizer.normalize(s.replace(PLUS_ONE, " plus ").replace("&", " and "), Normalizer.Form.NFD).replace(MARKS, "").lowercase()
         .replace(NON_WORD, "-").trim('-'))
     return if (key.isEmpty()) null else LogoKey(key, quality)
+}
+
+/**
+ * Compact keys one letter apart (a letter added, dropped or changed: "skycinemapremier" ~ "skycinemapremiere"), for
+ * names a playlist spells differently from the guide or tv-logos (#19, #24). Only keys of [NEAR_MIN]+ characters, never
+ * a digit ("bbc1" stays apart from "bbc2"), and only when exactly one key is that near. A last resort after exact keys.
+ */
+class NearKeys<V>(private val entries: Map<String, V>) {
+    private val byDelete = HashMap<String, MutableList<String>>()
+    init { for (k in entries.keys) if (k.length >= NEAR_MIN) letterDeletes(k).forEach { byDelete.getOrPut(it) { ArrayList(1) } += k } }
+
+    fun find(q: String): V? {
+        if (q.length < NEAR_MIN - 1) return null
+        val hits = HashSet<String>()
+        byDelete[q]?.let(hits::addAll) // the key has one letter more
+        for (d in letterDeletes(q)) { if (d.length >= NEAR_MIN && d in entries) hits += d; byDelete[d]?.let(hits::addAll) }
+        hits.remove(q)
+        return hits.filter { oneLetterApart(q, it) }.singleOrNull()?.let(entries::get)
+    }
+
+    private companion object {
+        const val NEAR_MIN = 8
+        fun letterDeletes(k: String) = k.indices.filter { k[it].isLetter() }.map { k.removeRange(it, it + 1) }.distinct()
+        /** Same length with one letter changed, or one letter more on either side. */
+        fun oneLetterApart(a: String, b: String): Boolean {
+            if (a.length == b.length) {
+                val i = a.indices.filter { a[it] != b[it] }
+                return i.size == 1 && a[i[0]].isLetter() && b[i[0]].isLetter()
+            }
+            val (s, l) = if (a.length < b.length) a to b else b to a
+            if (l.length - s.length != 1) return false
+            val i = s.indices.firstOrNull { s[it] != l[it] } ?: s.length
+            return l[i].isLetter() && s.substring(i) == l.substring(i + 1)
+        }
+    }
 }

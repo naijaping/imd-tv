@@ -41,6 +41,8 @@ abstract class ProviderDao {
     fun observeAll(): Flow<List<ProviderEntity>> = observeAllRaw().map { l -> l.map { it.opened() } }
     suspend fun all(): List<ProviderEntity> = allRaw().map { it.opened() }
     @Query("SELECT id FROM provider ORDER BY name") abstract suspend fun ids(): List<Long>
+    /** Playlists that can have live TV (not Plex, Jellyfin or Stremio), by name. */
+    @Query("SELECT id FROM provider WHERE type NOT IN ('PLEX', 'JELLYFIN', 'STREMIO') ORDER BY name") abstract suspend fun liveIds(): List<Long>
     /** Rows whose login is still plain text (saved before encryption), as stored. */
     suspend fun unsealed(): List<ProviderEntity> = allRaw().filter { !Secrets.isEncrypted(it.url) }
     @Query("UPDATE provider SET nameStrip = :s WHERE id = :id") abstract suspend fun setNameStrip(id: Long, s: String)
@@ -221,6 +223,12 @@ abstract class ChannelDao {
               AND mergeHead != (id IN (SELECT mergedInto FROM channel WHERE providerId = :p AND mergedInto IS NOT NULL))""")
     abstract suspend fun refreshMergeHeads(p: Long)
     @Query("UPDATE channel SET mergedInto = NULL, mergedAuto = 0 WHERE providerId = :p AND mergedAuto = 1") abstract suspend fun clearAutoMerges(p: Long): Int
+    /** Sync follower: drops what the user set per channel, before the master's is applied. Only rows that have any. */
+    @Query("""UPDATE channel SET hidden = 0, customName = NULL, customNumber = NULL, epgOffsetMinutes = NULL, parentalLock = 0,
+              mergedInto = CASE WHEN mergedAuto = 1 THEN mergedInto ELSE NULL END
+              WHERE providerId = :p AND (hidden = 1 OR customName IS NOT NULL OR customNumber IS NOT NULL OR epgOffsetMinutes IS NOT NULL
+              OR parentalLock = 1 OR (mergedInto IS NOT NULL AND mergedAuto = 0))""")
+    abstract suspend fun clearUserEdits(p: Long)
     /** Manage channels: how many channels are merged into each of a category's channels. */
     @Query("""SELECT mergedInto AS id, count(*) AS n FROM channel
               WHERE mergedInto IN (SELECT id FROM channel WHERE categoryId = :categoryId) GROUP BY mergedInto""")

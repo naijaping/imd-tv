@@ -42,9 +42,13 @@ class ProviderRepository(
 ) {
     private val activeKey = longPreferencesKey("active_provider_id")
 
-    /** A stored id whose playlist is gone (a crash between delete and the switch) reads as the first playlist left. */
+    /**
+     * A stored id whose playlist is gone (a crash between delete and the switch) reads as the first playlist left.
+     * A media server is active only when there is no IPTV playlist: 0.7.0's Movies rail switched to Plex, which emptied
+     * Live TV and moved the open-source guide sync onto it; this also repairs boxes left that way.
+     */
     val activeProviderId: Flow<Long?> = prefs.data.map { it[activeKey] }.distinctUntilChanged().map { id ->
-        val ids = db.providerDao().ids()
+        val ids = db.providerDao().liveIds().ifEmpty { db.providerDao().ids() }
         id?.takeIf { it in ids } ?: ids.firstOrNull()
     }
 

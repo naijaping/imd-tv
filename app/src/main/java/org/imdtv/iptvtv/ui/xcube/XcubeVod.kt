@@ -140,7 +140,7 @@ fun XcubeVod(vm: VodViewModel, card: XcubeCard, onOpen: (VodItem) -> Unit, onUse
                 }
                 // Other playlists switch on OK only: these rows don't select on focus like the ones above.
                 otherPlaylistItems(others, expanded, { id -> vm.expandedPlaylists.value = vm.expandedPlaylists.value.toggled(id) },
-                    { c -> vm.openAfterSwitch(c); onUsePlaylist(c) }) { title, trailing, header, nested, onClick ->
+                    { c -> if (vm.openOther(c)) onUsePlaylist(c) }) { title, trailing, header, nested, onClick ->
                     SectionRowBox(title, trailing, header, nested, onClick, Color(0xFFE8F5D8), CARD_TEXT)
                 }
             }

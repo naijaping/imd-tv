@@ -201,7 +201,7 @@ fun VodHomeScreen(vm: VodViewModel, nav: @Composable () -> Unit, onOpen: (VodIte
             onClose = { railOpen = false; refocus++ },
             others = others, expanded = vm.expandedPlaylists.collectAsState().value,
             onToggle = { id -> vm.expandedPlaylists.value = vm.expandedPlaylists.value.toggled(id) },
-            onPickOther = { cat -> vm.openAfterSwitch(cat); onUsePlaylist(cat); railOpen = false },
+            onPickOther = { cat -> if (vm.openOther(cat)) onUsePlaylist(cat); railOpen = false },
             activeTitle = vm.activeProvider.collectAsState().value?.railTitle())
     }
 }

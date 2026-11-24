@@ -13,8 +13,8 @@ Free and open source, with no ads, accounts or tracking.
 <a href="https://github.com/majorleeevil/imd-tv/releases/latest"><img src="https://img.shields.io/github/v/release/majorleeevil/imd-tv?style=flat-square&label=release" alt="Latest release"></a>
 <a href="https://github.com/majorleeevil/imd-tv/releases"><img src="https://img.shields.io/github/downloads/majorleeevil/imd-tv/total?style=flat-square&label=downloads&color=2ea44f" alt="Downloads"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="Licence: GPL-3.0"></a>
-<img src="https://img.shields.io/badge/Android%20TV-8.0%2B-2ea44f?style=flat-square" alt="Android TV 8.0 or newer">
-<a href="https://buymeacoffee.com/majorleeevil"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-optional-ffdd00?style=flat-square&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
+<img src="https://img.shields.io/badge/Android%20TV-7.1%2B-2ea44f?style=flat-square" alt="Android TV 7.1 or newer">
+<a href="https://www.paypal.com/ncp/payment/VGKUKA7GNGEWA"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-PayPal-ffdd00?style=flat-square&logo=paypal&logoColor=black" alt="Buy me a coffee via PayPal"></a>
 </p>
 
 <p align="center">
@@ -34,9 +34,12 @@ any box. Every screen is designed for the remote first, and it's tested on budge
 boxes. Your logins stay encrypted on your box, and nothing about what you watch leaves it.
 
 > [!IMPORTANT]
-> **New in 0.7.0:** Plex, Jellyfin and Stremio next to your playlist, TV guide search, one Favourites and Continue
-> watching for every playlist, parental controls, adding a playlist from your phone, and new ways to sort and show
-> channels. [All the changes](https://github.com/majorleeevil/imd-tv/releases/tag/v0.7.0).
+> **New in 0.7.1:** bug fixes. Plex no longer takes over Live TV, 4K movies from Plex and Jellyfin stop buffering, the
+> TV guide and logos find more channels, follower sync carries hidden and renamed channels, and it installs on older Fire
+> TV Sticks. [All the changes](https://github.com/majorleeevil/imd-tv/releases/tag/v0.7.1).
+>
+> **0.7.0** brought Plex, Jellyfin and Stremio next to your playlist, TV guide search, parental controls and more.
+> [0.7.0 changes](https://github.com/majorleeevil/imd-tv/releases/tag/v0.7.0).
 
 > [!NOTE]
 > IMD TV is a media player. It does not provide, sell or link to any channels or content. Use the playlist you
@@ -334,7 +337,7 @@ Six themes, all with the same fast guide:
 <details>
 <summary><b>Step-by-step install</b></summary>
 
-Requires Android TV / Google TV **8.0 or newer** (tested on Chromecast with Google TV and a Thomson 140 stick).
+Requires Android TV / Google TV **7.1 or newer**, or a Fire TV on Fire OS 6 or newer. Tested on Chromecast with Google TV and a Thomson 140 stick.
 
 ### Option 1: Downloader (on the TV)
 
@@ -392,7 +395,7 @@ Requires Android TV / Google TV **8.0 or newer** (tested on Chromecast with Goog
 ## Free forever, private by default
 
 IMD TV is free and always will be. No accounts, no ads, no analytics, and logins are encrypted on the device. If it's
-useful to you, you can [buy me a coffee](https://buymeacoffee.com/majorleeevil), entirely optional.
+useful to you, you can [buy me a coffee](https://www.paypal.com/ncp/payment/VGKUKA7GNGEWA), entirely optional.
 
 Questions or problems: support@imd-tv.com or [GitHub issues](https://github.com/majorleeevil/imd-tv/issues).
 

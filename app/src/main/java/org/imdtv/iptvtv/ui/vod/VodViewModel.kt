@@ -144,6 +144,20 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Opens [cat]'s grid once its playlist (being switched to) has loaded its categories. */
     fun openAfterSwitch(cat: CategoryEntity) { pendingGrid = cat; gridCategory.value = null; focused.value = null }
+
+    private var serverGrid: Long? = null // the media-server grid openOther opened, kept when the rail's categories change
+    /**
+     * OK on another playlist's category. A media server's grid opens right here: switching to it made it the active
+     * playlist, which emptied Live TV and moved the open-source guide sync onto it (Reddit / Thomson report, 0.7.0).
+     * True = the caller switches to that playlist (IPTV playlists, as before).
+     */
+    fun openOther(cat: CategoryEntity): Boolean {
+        if (otherPlaylists.value.find { it.provider.id == cat.providerId }?.provider?.type?.mediaServer != true) {
+            openAfterSwitch(cat); return true
+        }
+        serverGrid = cat.id; gridCategory.value = cat; focused.value = null
+        return false
+    }
     val grid: StateFlow<List<VodItem>> = gridCategory
         .flatMapLatest { cat -> if (cat?.id == CONTINUE_ID) continueWatching else kotlinx.coroutines.flow.flow { emit(cat?.let { inCategory(it.id, GRID_LIMIT) } ?: emptyList()) } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -155,7 +169,7 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         val p = provider.value ?: return@vodMatches emptyList()
         // All searches every playlist in use (this one's matches first); a category, only its own playlist.
         if (cat == null) inUse(k).flatMap { c.search.inCategory(it, k, null, q) }
-        else c.search.inCategory(p.id, k, cat.takeIf { it != CONTINUE_ID }, q)
+        else c.search.inCategory(gridCategory.value?.takeIf { it.id == cat }?.providerId ?: p.id, k, cat.takeIf { it != CONTINUE_ID }, q)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private suspend fun inUse(k: Kind): List<Long> = provider.value?.id?.let { c.providerRepository.inUse(it, k) } ?: emptyList()
@@ -174,7 +188,8 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             categories.collect { list ->
                 pendingGrid?.let { p -> list.find { it.category.id == p.id }?.let { gridCategory.value = it.category; pendingGrid = null } }
-                gridCategory.value?.let { g -> if (list.none { it.category.id == g.id }) gridCategory.value = null }
+                // shortcut: a media server's grid (openOther) stays open even if that server is removed meanwhile; check otherPlaylists if that bites.
+                gridCategory.value?.let { g -> if (g.id != serverGrid && list.none { it.category.id == g.id }) gridCategory.value = null }
             }
         }
     }
@@ -284,7 +299,8 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     private fun startPlay(p: ProviderEntity?, url: String, item: VodItem?, episode: String, startMs: Long) {
-        player.play(url, p?.userAgent, p?.login(), vod = true, startMs = startMs)
+        player.play(url, p?.userAgent, p?.login(), vod = true, startMs = startMs,
+            parallel = p?.type == org.imdtv.iptvtv.data.db.ProviderType.PLEX || p?.type == org.imdtv.iptvtv.data.db.ProviderType.JELLYFIN)
         learn?.cancel()
         if (item == null) return
         p?.let { c.watchProgress.start(it.id, item.kind, item.id, episode, url) }

@@ -160,7 +160,7 @@ fun RetroMenuScreen(
                             live.usePlaylistAt(c.providerId, c.id)
                             // Opens the guide on that category once the switched-to playlist's rail has it.
                             scope.launch { live.entry.first { it?.key == "c${c.id}" }?.let(onLiveCategory) }
-                        } else { vod.openAfterSwitch(c); live.usePlaylistAt(c.providerId, null) } // the grid opens when it loads
+                        } else if (vod.openOther(c)) live.usePlaylistAt(c.providerId, null) // the grid opens when it loads
                     }
                 }
             }
