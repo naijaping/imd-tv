@@ -55,6 +55,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val headerSize = stringPreferencesKey("header_size")
     private val previewFade = booleanPreferencesKey("preview_fade")
     private val showLiveIndicator = booleanPreferencesKey("show_live_indicator")
+    private val autoPlayFirstStream = booleanPreferencesKey("auto_play_first_stream")
     private val brandLogoPath = stringPreferencesKey("brand_logo_path")
     private val brandLogoUrl = stringPreferencesKey("brand_logo_url")
     private val heroLogoScale = floatPreferencesKey("hero_logo_scale")
@@ -146,6 +147,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             headerSize = HeaderSize.entries.find { it.name == this[headerSize] } ?: d.headerSize,
             previewFade = this[previewFade] ?: d.previewFade,
             showLiveIndicator = this[showLiveIndicator] ?: d.showLiveIndicator,
+            autoPlayFirstStream = this[autoPlayFirstStream] ?: d.autoPlayFirstStream,
             brandLogoPath = this[brandLogoPath],
             brandLogoUrl = this[brandLogoUrl],
             heroLogoScale = this[heroLogoScale] ?: d.heroLogoScale,
@@ -228,6 +230,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         this[headerSize] = s.headerSize.name
         this[previewFade] = s.previewFade
         this[showLiveIndicator] = s.showLiveIndicator
+        this[autoPlayFirstStream] = s.autoPlayFirstStream
         s.brandLogoPath?.let { this[brandLogoPath] = it } ?: remove(brandLogoPath)
         s.brandLogoUrl?.let { this[brandLogoUrl] = it } ?: remove(brandLogoUrl)
         this[heroLogoScale] = s.heroLogoScale

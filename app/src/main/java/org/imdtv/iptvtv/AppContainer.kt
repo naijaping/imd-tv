@@ -42,6 +42,11 @@ class AppContainer(context: Context) {
             .build()
     }
     val json: Json = xtreamJson()
+    /** Stremio add-ons: their requests (cached, cancellable) and the Addons page's list. */
+    val addonClient by lazy { org.imdtv.iptvtv.data.addons.AddonClient(http, appContext.cacheDir, json) }
+    val addons by lazy { org.imdtv.iptvtv.data.addons.AddonRepository(prefs, addonClient, json) }
+    /** The installed add-ons as one VOD source (details, streams, subtitles); never a playlist, so never the one in use. */
+    val addonSource by lazy { org.imdtv.iptvtv.data.source.StremioSource(null, emptySet(), addonClient) { addons.enabledNow() } }
     val dispatcharr by lazy { org.imdtv.iptvtv.data.source.DispatcharrAuth(http, json) }
     val prefs: DataStore<Preferences> by lazy {
         PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") }
@@ -59,7 +64,7 @@ class AppContainer(context: Context) {
             p.skipLibraries.split(',').filter { it.isNotEmpty() }.toSet(), http, json)
         ProviderType.JELLYFIN -> org.imdtv.iptvtv.data.source.JellyfinSource(p.url, p.password.orEmpty(), p.username.orEmpty(), jellyfinHeader,
             p.skipLibraries.split(',').filter { it.isNotEmpty() }.toSet(), http, json)
-        ProviderType.STREMIO -> org.imdtv.iptvtv.data.source.StremioSource(p.password.orEmpty(), p.skipLibraries.split(',').filter { it.isNotEmpty() }.toSet(), stremioAuth, http, json)
+        ProviderType.STREMIO -> org.imdtv.iptvtv.data.source.StremioSource(p.password.orEmpty(), p.skipLibraries.split(',').filter { it.isNotEmpty() }.toSet(), stremioAuth, addonClient)
     }
 
     /** Plex's X-Plex-Client-Identifier: this install's Android id (stable, needs no storage). */

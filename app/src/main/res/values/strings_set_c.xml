@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stremio add-ons (Settings › Addons, Movies & Series rows, the stream list). -->
+<resources>
+    <string name="set_c_addon_bad_url">That isn\'t an add-on address. Paste its manifest link: https://…/manifest.json or stremio://…</string>
+    <string name="set_c_addon_unreachable">Couldn\'t reach the add-on. Check the address and that the TV is online</string>
+    <string name="set_c_addon_timeout">The add-on took too long to answer. Try again later</string>
+    <string name="set_c_addon_http">The add-on answered with error %1$d</string>
+    <string name="set_c_addon_not_addon">That address didn\'t return an add-on manifest</string>
+    <string name="set_c_addon_needs_config">This add-on has to be configured first. Open its page in a browser, set it up, then paste the configured address it gives you</string>
+    <string name="set_c_group_addons">Addons</string>
+    <string name="set_c_addons_intro">Stremio add-ons (Cinemeta, Nuvio and others): their catalogs show as rows in Movies and Series, and their streams play from a title\'s page. Paste an add-on\'s manifest link to add it.</string>
+    <string name="set_c_addon_url">Manifest URL (https://…/manifest.json or stremio://…)</string>
+    <string name="set_c_addon_check">Check</string>
+    <string name="set_c_addon_checking">Checking…</string>
+    <string name="set_c_addon_install">Install</string>
+    <string name="set_c_addon_installed">%1$s added</string>
+    <string name="set_c_addon_refreshed">Manifest updated</string>
+    <string name="set_c_autoplay_stream">Play the first stream automatically</string>
+    <string name="set_c_autoplay_stream_expl">Off: choose from every add-on\'s streams. On: play the first one the top add-on gives</string>
+    <string name="set_c_installed">Installed add-ons (top first: rows and streams follow this order)</string>
+    <string name="set_c_none_installed">No add-ons yet</string>
+    <string name="set_c_n_catalogs">%1$d of %2$d rows on</string>
+    <string name="set_c_res_catalog">catalogs</string>
+    <string name="set_c_res_meta">details</string>
+    <string name="set_c_res_stream">streams</string>
+    <string name="set_c_res_subtitles">subtitles</string>
+    <string name="set_c_types">Types: %1$s</string>
+    <string name="set_c_gives">Gives: %1$s</string>
+    <string name="set_c_catalogs">Catalogs: %1$s</string>
+    <string name="set_c_and_more">" and %1$d more"</string>
+    <string name="set_c_no_streams_note">This add-on gives no streams: add one that does to play its titles</string>
+    <string name="set_c_removed">This add-on was removed</string>
+    <string name="set_c_use_addon">Use this add-on</string>
+    <string name="set_c_use_addon_expl">Off: its rows, search and streams are left out, its settings kept</string>
+    <string name="set_c_move_up">Move up</string>
+    <string name="set_c_move_down">Move down</string>
+    <string name="set_c_move_expl">Number %1$d of %2$d: higher add-ons\' rows come first and their streams are tried first</string>
+    <string name="set_c_refresh">Refresh manifest</string>
+    <string name="set_c_refresh_expl">Fetch the add-on\'s manifest again for new catalogs or a new version</string>
+    <string name="set_c_catalogs_header">Catalogs</string>
+    <string name="set_c_remove">Remove add-on</string>
+    <string name="set_c_remove_expl">Its rows and streams go; add it again with its address</string>
+    <string name="set_c_remove_confirm">Press OK again to remove it</string>
+    <string name="set_c_cat_other_type">A type the app doesn\'t list (only movies and series are shown)</string>
+    <string name="set_c_cat_row">A row in Movies or Series</string>
+    <string name="set_c_cat_and_search">" and in search"</string>
+    <string name="set_c_cat_search_only">Used for search only</string>
+    <string name="set_c_cat_needs_choice">Needs a choice (such as a genre) first: not shown</string>
+</resources>

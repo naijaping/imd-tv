@@ -281,6 +281,51 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun removePack() = launchFor { c.logoPack.remove(it); packStatus.value = null }
 
+    // --- Settings › Addons (Stremio add-ons by manifest URL) ---
+
+    /** Add addon: checking the pasted address, why it failed, or the manifest to preview before installing. */
+    sealed interface AddonCheck {
+        data object Checking : AddonCheck
+        data class Failed(val message: String) : AddonCheck
+        data class Preview(val addon: org.imdtv.iptvtv.data.source.StremioAddon, val raw: String) : AddonCheck
+    }
+    val addonCheck = MutableStateFlow<AddonCheck?>(null)
+    val addonEntries: StateFlow<List<org.imdtv.iptvtv.data.addons.AddonEntry>> = c.addons.entries.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Refresh manifest's result per add-on URL: null while running, then a message. */
+    val addonStatus = MutableStateFlow<Map<String, String?>>(emptyMap())
+    private var checking: kotlinx.coroutines.Job? = null
+
+    private fun addonError(e: Exception) = if (e is org.imdtv.iptvtv.data.addons.AddonException) getApplication<Application>().getString(e.resId, *e.args.toTypedArray())
+        else str(R.string.set_c_addon_unreachable)
+
+    fun checkAddon(text: String) {
+        checking?.cancel()
+        addonCheck.value = AddonCheck.Checking
+        checking = viewModelScope.launch {
+            addonCheck.value = try { c.addons.check(text).let { (a, raw) -> AddonCheck.Preview(a, raw) } }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { android.util.Log.i("IptvAddons", "Add-on check failed: ${e.message}"); AddonCheck.Failed(addonError(e)) } // never the URL
+        }
+    }
+    fun cancelAddonCheck() { checking?.cancel(); addonCheck.value = null }
+    fun installChecked() {
+        val p = addonCheck.value as? AddonCheck.Preview ?: return
+        viewModelScope.launch { c.addons.install(p.addon, p.raw); addonCheck.value = null; notice.value = str(R.string.set_c_addon_installed, p.addon.name) }
+    }
+    fun removeAddon(url: String) = viewModelScope.launch { c.addons.remove(url) }
+    fun moveAddon(url: String, delta: Int) = viewModelScope.launch { c.addons.move(url, delta) }
+    fun setAddonEnabled(url: String, on: Boolean) = viewModelScope.launch { c.addons.setEnabled(url, on) }
+    fun setAddonCatalog(url: String, key: String, on: Boolean) = viewModelScope.launch { c.addons.setCatalog(url, key, on) }
+    fun refreshAddon(url: String) {
+        if (addonStatus.value.containsKey(url) && addonStatus.value[url] == null) return // already refreshing
+        addonStatus.value = addonStatus.value + (url to null)
+        viewModelScope.launch {
+            val msg = try { c.addons.refresh(url); str(R.string.set_c_addon_refreshed) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { addonError(e) }
+            addonStatus.value = addonStatus.value + (url to msg)
+        }
+    }
+
     // Brand logo (Appearance › Live TV): the guide's top-left image.
     /** Under the Brand logo row: "Saving…", or why the last try failed (the current logo is kept); null once saved. */
     val brandStatus = MutableStateFlow<String?>(null)

@@ -213,4 +213,17 @@
     <string name="vod_search_no_programmes">No programmes found</string>
     <string name="vod_search_on_now">On now</string>
     <string name="vod_stremio_no_stream">No playable stream: this title\'s add-ons offer only torrents, or nothing</string>
+    <string name="vod_streams_auto">Playing the first stream the top add-on gives…</string>
+    <string name="vod_streams_asking">Asking your add-ons for streams…</string>
+    <string name="vod_streams_no_addons">None of your add-ons gives streams for this title. Add one in Settings › Addons</string>
+    <string name="vod_streams_none">No stream here can play in this app</string>
+    <string name="vod_streams_group_loading">asking…</string>
+    <string name="vod_streams_group_timeout">no answer in time</string>
+    <string name="vod_streams_group_failed">didn\'t answer</string>
+    <string name="vod_streams_group_empty">no streams</string>
+    <string name="vod_stream_needs_torrent">needs a torrent player</string>
+    <string name="vod_stream_youtube">a YouTube video</string>
+    <string name="vod_stream_external">opens in a browser</string>
+    <string name="vod_stream_unsupported">can\'t play here</string>
+    <string name="vod_searching_addons">Searching your add-ons…</string>
 </resources>

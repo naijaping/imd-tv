@@ -1,0 +1,778 @@
+{
+ "id": "com.nuvio.tmdb.catalogs",
+ "version": "1.2.0",
+ "name": "Nuvio Catalog Addon",
+ "description": "Catalog addon for Nuvio powered by TMDB.",
+ "resources": [
+  "catalog",
+  {
+   "name": "meta",
+   "types": [
+    "movie",
+    "series"
+   ],
+   "idPrefixes": [
+    "tt",
+    "tmdb:"
+   ]
+  }
+ ],
+ "types": [
+  "movie",
+  "series"
+ ],
+ "catalogs": [
+  {
+   "type": "movie",
+   "id": "trending-movies",
+   "name": "Trending Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "trending-series",
+   "name": "Trending Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "popular-movies",
+   "name": "Popular Movies",
+   "extra": [
+    {
+     "name": "search",
+     "isRequired": false
+    },
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Fantasy",
+      "History",
+      "Horror",
+      "Music",
+      "Mystery",
+      "Romance",
+      "Science Fiction",
+      "TV Movie",
+      "Thriller",
+      "War",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "popular-series",
+   "name": "Popular Series",
+   "extra": [
+    {
+     "name": "search",
+     "isRequired": false
+    },
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action & Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Kids",
+      "Mystery",
+      "News",
+      "Reality",
+      "Sci-Fi & Fantasy",
+      "Soap",
+      "Talk",
+      "War & Politics",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "airing-today-series",
+   "name": "Airing Today",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "critically-acclaimed-movies",
+   "name": "Critically Acclaimed Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Fantasy",
+      "History",
+      "Horror",
+      "Music",
+      "Mystery",
+      "Romance",
+      "Science Fiction",
+      "TV Movie",
+      "Thriller",
+      "War",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "critically-acclaimed-series",
+   "name": "Critically Acclaimed Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action & Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Kids",
+      "Mystery",
+      "News",
+      "Reality",
+      "Sci-Fi & Fantasy",
+      "Soap",
+      "Talk",
+      "War & Politics",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "new-and-upcoming-movies",
+   "name": "New and Upcoming Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Fantasy",
+      "History",
+      "Horror",
+      "Music",
+      "Mystery",
+      "Romance",
+      "Science Fiction",
+      "TV Movie",
+      "Thriller",
+      "War",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "new-and-returning-series",
+   "name": "New and Returning Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action & Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Kids",
+      "Mystery",
+      "News",
+      "Reality",
+      "Sci-Fi & Fantasy",
+      "Soap",
+      "Talk",
+      "War & Politics",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "movies-by-year",
+   "name": "Movies by Year",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "2026",
+      "2025",
+      "2024",
+      "2023",
+      "2022",
+      "2021",
+      "2020",
+      "2019",
+      "2018",
+      "2017",
+      "2016",
+      "2015",
+      "2014",
+      "2013",
+      "2012",
+      "2011",
+      "2010",
+      "2009",
+      "2008",
+      "2007",
+      "2006",
+      "2005",
+      "2004",
+      "2003",
+      "2002",
+      "2001",
+      "2000",
+      "1999",
+      "1998",
+      "1997",
+      "1996",
+      "1995",
+      "1994",
+      "1993",
+      "1992",
+      "1991",
+      "1990"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "series-by-year",
+   "name": "Series by Year",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "2026",
+      "2025",
+      "2024",
+      "2023",
+      "2022",
+      "2021",
+      "2020",
+      "2019",
+      "2018",
+      "2017",
+      "2016",
+      "2015",
+      "2014",
+      "2013",
+      "2012",
+      "2011",
+      "2010",
+      "2009",
+      "2008",
+      "2007",
+      "2006",
+      "2005",
+      "2004",
+      "2003",
+      "2002",
+      "2001",
+      "2000",
+      "1999",
+      "1998",
+      "1997",
+      "1996",
+      "1995",
+      "1994",
+      "1993",
+      "1992",
+      "1991",
+      "1990"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "movies-by-language",
+   "name": "Movies by Language",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "English",
+      "Spanish",
+      "French",
+      "German",
+      "Italian",
+      "Portuguese",
+      "Korean",
+      "Japanese",
+      "Chinese",
+      "Hindi",
+      "Arabic",
+      "Turkish",
+      "Russian",
+      "Polish",
+      "Dutch"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "series-by-language",
+   "name": "Series by Language",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "English",
+      "Spanish",
+      "French",
+      "German",
+      "Italian",
+      "Portuguese",
+      "Korean",
+      "Japanese",
+      "Chinese",
+      "Hindi",
+      "Arabic",
+      "Turkish",
+      "Russian",
+      "Polish",
+      "Dutch"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "netflix-movies",
+   "name": "Netflix Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Fantasy",
+      "History",
+      "Horror",
+      "Music",
+      "Mystery",
+      "Romance",
+      "Science Fiction",
+      "TV Movie",
+      "Thriller",
+      "War",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "netflix-series",
+   "name": "Netflix Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action & Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Kids",
+      "Mystery",
+      "News",
+      "Reality",
+      "Sci-Fi & Fantasy",
+      "Soap",
+      "Talk",
+      "War & Politics",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "disney-plus-movies",
+   "name": "Disney+ Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Fantasy",
+      "History",
+      "Horror",
+      "Music",
+      "Mystery",
+      "Romance",
+      "Science Fiction",
+      "TV Movie",
+      "Thriller",
+      "War",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "disney-plus-series",
+   "name": "Disney+ Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action & Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Kids",
+      "Mystery",
+      "News",
+      "Reality",
+      "Sci-Fi & Fantasy",
+      "Soap",
+      "Talk",
+      "War & Politics",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "prime-video-movies",
+   "name": "Prime Video Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Fantasy",
+      "History",
+      "Horror",
+      "Music",
+      "Mystery",
+      "Romance",
+      "Science Fiction",
+      "TV Movie",
+      "Thriller",
+      "War",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "prime-video-series",
+   "name": "Prime Video Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    },
+    {
+     "name": "genre",
+     "isRequired": false,
+     "options": [
+      "Action & Adventure",
+      "Animation",
+      "Comedy",
+      "Crime",
+      "Documentary",
+      "Drama",
+      "Family",
+      "Kids",
+      "Mystery",
+      "News",
+      "Reality",
+      "Sci-Fi & Fantasy",
+      "Soap",
+      "Talk",
+      "War & Politics",
+      "Western"
+     ],
+     "optionsLimit": 1
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "international-cinema",
+   "name": "International Cinema",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "international-series",
+   "name": "International Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "independent-and-festival-picks",
+   "name": "Independent & Festival Picks",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "limited-series",
+   "name": "Limited Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "documentaries",
+   "name": "Documentaries",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "documentary-series",
+   "name": "Documentary Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "movie",
+   "id": "family-movies",
+   "name": "Family Movies",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  },
+  {
+   "type": "series",
+   "id": "family-series",
+   "name": "Family Series",
+   "extra": [
+    {
+     "name": "skip",
+     "isRequired": false
+    }
+   ]
+  }
+ ],
+ "config": [
+  {
+   "key": "language",
+   "type": "text",
+   "title": "Language locale",
+   "default": "en-US",
+   "required": true
+  },
+  {
+   "key": "region",
+   "type": "text",
+   "title": "Region",
+   "default": "US",
+   "required": true
+  }
+ ],
+ "behaviorHints": {
+  "configurable": true,
+  "adult": false,
+  "p2p": false
+ }
+}

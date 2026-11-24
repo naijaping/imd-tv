@@ -266,8 +266,8 @@ class MainActivity : ComponentActivity() {
                             else -> org.imdtv.iptvtv.recording.RecordingsScreen(nav, app::playRecording)
                         }
                         is Screen.Detail -> VodDetailScreen(vod, top.item, onPlay = { url, title, episode, startMs ->
-                            vod.play(url, top.item, episode, startMs)
-                            app.playFullScreen(title, live = false)
+                            // Full screen once it starts: a Stremio title first shows its stream list here.
+                            vod.play(url, top.item, episode, startMs, title) { app.playFullScreen(title, live = false) }
                         }, onOpen = app::open)
                         is Screen.Player -> PlayerScreen(app.player, top.title, live.takeIf { top.live }, onGuide = { app.back() }, showClock = settings.playerClock == org.imdtv.iptvtv.data.settings.PlayerClock.ALL ||
                             settings.playerClock == org.imdtv.iptvtv.data.settings.PlayerClock.LIVE && top.live, aspect = settings.videoAspect)

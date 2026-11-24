@@ -183,6 +183,8 @@ data class AppSettings(
     val previewFade: Boolean = true,
     /** The red-dot LIVE badge at the top right of the guide's preview. */
     val showLiveIndicator: Boolean = true,
+    /** Settings › Addons: play the first playable stream (best add-on first) instead of showing the list. Not backed up. */
+    val autoPlayFirstStream: Boolean = false,
     /** Celestial/Liquid Glass guide, top left: a copy of the chosen image in app storage (BrandLogo); null = the app's logo. Not backed up: per box. */
     val brandLogoPath: String? = null,
     /** The address [brandLogoPath] was downloaded from (Logo image URL); null when it came from a file or is the default. */

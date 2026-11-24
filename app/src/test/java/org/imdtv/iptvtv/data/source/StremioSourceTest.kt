@@ -3,6 +3,7 @@ package org.imdtv.iptvtv.data.source
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.last
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -111,9 +112,12 @@ class StremioSourceTest {
         assertEquals(listOf("cinemeta/movie/top" to Kind.MOVIE, "cinemeta/series/top" to Kind.SERIES), a.catalogs(a.addons("KEY")).map { it.first to it.third })
     }
 
-    @Test fun syncDetailAndStreams() = runTest {
+    private fun client() = org.imdtv.iptvtv.data.addons.AddonClient(http, null, json)
+
+    // runBlocking: the stream add-ons' per-add-on timeout must run on the real clock, not runTest's virtual one.
+    @Test fun syncDetailAndStreams() = kotlinx.coroutines.runBlocking {
         start()
-        val src = StremioSource("KEY", emptySet(), auth(), http, json)
+        val src = StremioSource("KEY", emptySet(), auth(), client())
         val movies = src.movies()
         assertEquals(53, movies.size)
         assertEquals(Triple("Film 0", 2024, 7.5), movies[0].let { Triple(it.name, it.year, it.rating) })
@@ -122,11 +126,12 @@ class StremioSourceTest {
         // Specials (season 0) left out, the rest in order.
         assertEquals(listOf("One", "Two"), src.seriesDetail("tt9").episodes.map { it.title })
         // The torrent add-on comes first but only the direct link plays; a torrent-only title has nothing.
-        assertEquals("https://cdn/film.mp4", src.stream("${STREMIO_PLAY}movie/tt1"))
-        assertNull(src.stream("${STREMIO_PLAY}series/tt9:1:1"))
+        suspend fun pick(play: String) = org.imdtv.iptvtv.data.addons.autoPick(src.streams(play).last())
+        assertEquals("https://cdn/film.mp4", (pick("${STREMIO_PLAY}movie/tt1") as org.imdtv.iptvtv.data.addons.AutoPick.Play).stream.playUrl)
+        assertEquals(org.imdtv.iptvtv.data.addons.AutoPick.None, pick("${STREMIO_PLAY}series/tt9:1:1"))
         // Unticked catalogs aren't fetched.
         paths.clear()
-        assertTrue(StremioSource("KEY", setOf("cinemeta/movie/top"), auth(), http, json).movies().isEmpty())
+        assertTrue(StremioSource("KEY", setOf("cinemeta/movie/top"), auth(), client()).movies().isEmpty())
         assertTrue(paths.none { "catalog" in it })
     }
 }

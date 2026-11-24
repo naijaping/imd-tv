@@ -220,13 +220,16 @@ class PlayerManager(private val context: Context) {
     /** [startMs]: a movie/episode starts there (resume), applied when the stream loads, also after the guard or a portal link. */
     /** [fallbackUrl]: played instead when [url] fails (catch-up's second link form), without the usual retries first. */
     /** [parallel]: a Plex/Jellyfin file, fetched over several connections (ParallelDataSource); never an IPTV provider. */
+    /** [subtitles]: subtitle files to offer beside the stream's own tracks (Stremio subtitle add-ons). */
     fun play(url: String, userAgent: String?, login: Login? = null, vod: Boolean = false, drm: Drm? = null, startMs: Long = 0,
-             fallbackUrl: String? = null, parallel: Boolean = false) {
+             fallbackUrl: String? = null, parallel: Boolean = false, subtitles: List<ExternalSubtitle> = emptyList()) {
         fallback = fallbackUrl
         this.parallel = parallel
+        externalSubtitles = subtitles
         play(url, userAgent, login, vod, drm, guarded = true, startMs)
     }
     private var fallback: String? = null
+    private var externalSubtitles: List<ExternalSubtitle> = emptyList()
     private var parallel = false
     /** A quarter of the RAM free now, 32–256 MiB: ~1 min of a 33 Mbit/s 4K file on a 2 GB box (#32). */
     private val readAheadBytes: Long get() {
@@ -337,6 +340,8 @@ class PlayerManager(private val context: Context) {
     }
 
     private fun mediaItem(uri: String, spec: DrmSpec?): MediaItem = MediaItem.Builder().setUri(uri).apply {
+        // Side-loaded subtitle files show in the player's subtitle menu beside the stream's own tracks.
+        if (externalSubtitles.isNotEmpty()) setSubtitleConfigurations(externalSubtitles.map { it.configuration() })
         spec ?: return@apply
         setDrmConfiguration(MediaItem.DrmConfiguration.Builder(if (spec.scheme == DrmScheme.WIDEVINE) C.WIDEVINE_UUID else C.CLEARKEY_UUID).apply {
             // The playlist's licence server wins over one named in the manifest, as in Kodi.
@@ -530,3 +535,22 @@ private class StreamAspectVideoRenderer(
     private companion object { const val SAR_W = "sar-width"; const val SAR_H = "sar-height" }
 }
 
+/** A subtitle file to load beside a stream: its URL and language code (ISO 639-1/-2, or any text). */
+data class ExternalSubtitle(val url: String, val language: String) {
+    /** The format from the file name; SubRip when it doesn't say (subtitle add-ons mostly serve .srt without one). */
+    fun mimeType(): String {
+        val path = android.net.Uri.parse(url).lastPathSegment.orEmpty().lowercase()
+        return when {
+            path.endsWith(".vtt") -> androidx.media3.common.MimeTypes.TEXT_VTT
+            path.endsWith(".ass") || path.endsWith(".ssa") -> androidx.media3.common.MimeTypes.TEXT_SSA
+            path.endsWith(".ttml") || path.endsWith(".dfxp") || path.endsWith(".xml") -> androidx.media3.common.MimeTypes.APPLICATION_TTML
+            else -> androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
+        }
+    }
+
+    fun configuration(): MediaItem.SubtitleConfiguration = MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(url))
+        .setMimeType(mimeType()).setLanguage(language)
+        // The language's own name ("English"), or what the add-on sent; the menu tells same-language files apart by order.
+        .setLabel(java.util.Locale(language).displayLanguage.takeIf { it.isNotBlank() && it != language } ?: language)
+        .build()
+}

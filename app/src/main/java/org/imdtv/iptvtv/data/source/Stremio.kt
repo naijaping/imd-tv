@@ -78,7 +78,7 @@ class StremioAuth(private val http: OkHttpClient, private val json: Json, privat
     suspend fun addons(authKey: String): List<StremioAddon> =
         call(post("addonCollectionGet", "type" to "AddonCollectionGet", "authKey" to authKey, "update" to true)).arr("addons").mapNotNull { a ->
             val url = a.str("transportUrl") ?: return@mapNotNull null
-            StremioAddon.of(url, (a as JsonObject)["manifest"] ?: return@mapNotNull null)
+            runCatching { StremioAddon.of(url, (a as JsonObject)["manifest"] ?: return@mapNotNull null) }.getOrNull()
         }
 
     /**
@@ -133,77 +133,126 @@ class StremioAuth(private val http: OkHttpClient, private val json: Json, privat
     }
 
     /** Movie and series catalogs as (key, "Catalog · Add-on", kind): one needing a search or genre to answer is left out. */
-    fun catalogs(addons: List<StremioAddon>): List<Triple<String, String, Kind>> = addons.flatMap { a -> a.catalogs.map { Triple(it.key, "${it.name} · ${a.name}", it.kind) } }
+    fun catalogs(addons: List<StremioAddon>): List<Triple<String, String, Kind>> = addons.flatMap { a -> a.catalogs.map { Triple(it.key, "${it.name} · ${a.name}", it.kind!!) } }
 }
 
 data class StremioLink(val code: String, val url: String)
 
-data class StremioCatalog(val key: String, val type: String, val id: String, val name: String, val kind: Kind)
+/** An add-on title as a poster: its id (an IMDb "tt…" or the add-on's own), name, poster, year and rating. */
+data class AddonCard(val id: String, val name: String, val poster: String?, val year: Int?, val rating: Double?)
+
+/**
+ * One catalog of an add-on. [kind] null: a type the app doesn't list (tv, channel…). [browse]: it answers with no extra
+ * (a row can show it); [search]: it takes `search=`; [skip]: it pages with `skip=`.
+ */
+data class StremioCatalog(val key: String, val type: String, val id: String, val name: String, val kind: Kind?,
+                          val search: Boolean = false, val skip: Boolean = false, val browse: Boolean = true)
 
 /** One add-on: where it lives, what it lists and whether it answers streams / details for a type and id. */
-data class StremioAddon(val base: String, val id: String, val name: String, val catalogs: List<StremioCatalog>,
-                        private val resources: List<Triple<String, Set<String>?, List<String>?>>) {
+data class StremioAddon(
+    /** The manifest URL, query included: it may hold a personal token (AddonUrls.mask it, never log it). */
+    val manifestUrl: String, val id: String, val name: String,
+    /** Movie and series catalogs that list without a search or genre: the rows and categories. */
+    val catalogs: List<StremioCatalog>,
+    private val resources: List<Triple<String, Set<String>?, List<String>?>>,
+    val version: String = "", val description: String? = null, val logo: String? = null, val types: List<String> = emptyList(),
+    /** Every catalog, any type (the Addons page lists them all). */
+    val allCatalogs: List<StremioCatalog> = catalogs,
+    val configurable: Boolean = false, val configurationRequired: Boolean = false,
+) {
+    val base get() = org.imdtv.iptvtv.data.addons.AddonUrls.base(manifestUrl)
+    /** `{base}/{resource}/{type}/{id}[/{extra}].json`, with the manifest's query kept. */
+    fun url(resource: String, type: String, id: String, extra: String? = null) =
+        org.imdtv.iptvtv.data.addons.AddonUrls.resource(manifestUrl, resource, type, id, extra)
+    /** Movie / series catalogs that take a search. */
+    val searchCatalogs get() = allCatalogs.filter { it.search && it.kind != null }
+    fun hasResource(name: String) = resources.any { it.first == name }
+    val resourceNames get() = resources.map { it.first }.distinct()
+
     /** Answers [resource] ("stream", "meta") for [type] and [id] (its idPrefixes, when it lists any). */
     fun serves(resource: String, type: String, id: String) = resources.any { (name, types, prefixes) ->
         name == resource && (types == null || type in types) && (prefixes == null || prefixes.any { id.startsWith(it) })
     }
 
+    /** Without the catalogs switched off on the Addons page (keys). */
+    fun without(off: Set<String>) = if (off.isEmpty()) this else copy(catalogs = catalogs.filter { it.key !in off }, allCatalogs = allCatalogs.filter { it.key !in off })
+
     companion object {
+        private fun JsonElement?.strings(key: String) = arr(key).mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+
+        /** Parses a manifest; throws [IllegalArgumentException] when it isn't one (no id, name or resources). */
         fun of(transportUrl: String, m: JsonElement): StremioAddon {
-            val types = m.arr("types").mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.toSet()
-            val prefixes = m.arr("idPrefixes").mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.ifEmpty { null }
+            val types = m.strings("types").toSet()
+            val prefixes = m.strings("idPrefixes").ifEmpty { null }
             // A resource is "stream", or {name, types, idPrefixes} narrowing the manifest's own.
             val res = m.arr("resources").mapNotNull { r ->
                 if (r is JsonPrimitive) Triple(r.content, types, prefixes)
-                else r.str("name")?.let { n -> Triple(n, r.arr("types").mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.toSet().ifEmpty { types }, r.arr("idPrefixes").mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.ifEmpty { prefixes }) }
+                else r.str("name")?.let { n -> Triple(n, r.strings("types").toSet().ifEmpty { types }, r.strings("idPrefixes").ifEmpty { prefixes }) }
             }
             val id = m.str("id").orEmpty()
-            val cats = m.arr("catalogs").mapNotNull { c ->
-                val kind = when (c.str("type")) { "movie" -> Kind.MOVIE; "series" -> Kind.SERIES; else -> return@mapNotNull null }
-                val required = c.arr("extra").any { e -> (e as? JsonObject)?.get("isRequired")?.jsonPrimitive?.contentOrNull == "true" } || c.arr("extraRequired").isNotEmpty()
-                if (required) return@mapNotNull null
+            val name = m.str("name").orEmpty()
+            require(id.isNotBlank() && name.isNotBlank() && (res.isNotEmpty() || m.arr("catalogs").isNotEmpty())) { "not a manifest" }
+            val all = m.arr("catalogs").mapNotNull { c ->
+                val type = c.str("type") ?: return@mapNotNull null
                 val cid = c.str("id") ?: return@mapNotNull null
-                StremioCatalog("$id/${c.str("type")}/$cid", c.str("type")!!, cid, c.str("name") ?: cid, kind)
+                val kind = when (type) { "movie" -> Kind.MOVIE; "series" -> Kind.SERIES; else -> null }
+                // extra: [{name, isRequired}]; older manifests: extraSupported / extraRequired name lists.
+                val extras = c.arr("extra").mapNotNull { e -> e.str("name")?.let { it to ((e as JsonObject)["isRequired"]?.jsonPrimitive?.booleanOrNull == true || e.str("isRequired") == "true") } } +
+                    c.strings("extraSupported").map { it to false } + c.strings("extraRequired").map { it to true }
+                val required = extras.filter { it.second }.map { it.first }.toSet()
+                StremioCatalog("$id/$type/$cid", type, cid, c.str("name") ?: cid, kind,
+                    search = extras.any { it.first == "search" } && required.all { it == "search" },
+                    skip = extras.any { it.first == "skip" }, browse = required.isEmpty())
             }
-            return StremioAddon(transportUrl.removeSuffix("/manifest.json").trimEnd('/'), id, m.str("name") ?: id, cats, res)
+            val hints = (m as? JsonObject)?.get("behaviorHints") as? JsonObject
+            fun hint(k: String) = hints?.get(k)?.let { it as? JsonPrimitive }?.booleanOrNull == true
+            return StremioAddon(transportUrl, id, name, all.filter { it.kind != null && it.browse }, res,
+                version = m.str("version").orEmpty(), description = m.str("description"), logo = m.str("logo"),
+                types = types.toList(), allCatalogs = all, configurable = hint("configurable"), configurationRequired = hint("configurationRequired"))
         }
     }
 }
 
 /**
- * A Stremio account's add-ons as a playlist's VOD (no live): their movie and series catalogs (capped, they are open-ended)
- * as categories. Links are [STREMIO_PLAY] ids; [stream] asks the stream add-ons at play time and takes the first direct
- * link (torrent-only answers can't play: no torrent engine, a known limitation).
+ * Stremio add-ons as VOD: a Stremio account's (a media-server playlist: catalogs synced as categories, Continue watching
+ * both ways) or the add-ons installed on the Addons page ([addons] given, no account). Links are [STREMIO_PLAY] ids;
+ * the streams are asked for at play time (AddonClient.streams), so a torrent-only answer shows as unplayable (no
+ * torrent engine, a known limitation).
  */
-class StremioSource(private val authKey: String, private val skip: Set<String>, private val auth: StremioAuth,
-                    private val http: OkHttpClient, private val json: Json) : PlaylistSource {
-    private var addonCache: List<StremioAddon>? = null
-    private suspend fun addons() = addonCache ?: auth.addons(authKey).also { addonCache = it }
-    private suspend fun catalogs(kind: Kind) = addons().flatMap { a -> a.catalogs.filter { it.kind == kind && it.key !in skip }.map { a to it } }
+class StremioSource(
+    private val account: Pair<String, StremioAuth>?, private val skip: Set<String>, private val client: org.imdtv.iptvtv.data.addons.AddonClient,
+    /** Where the add-ons come from: the account's collection (cached for this source) or the Addons page. */
+    private val addonList: suspend () -> List<StremioAddon> = { account!!.second.addons(account.first) },
+) : PlaylistSource {
+    /** A Stremio account playlist. */
+    constructor(authKey: String, skip: Set<String>, auth: StremioAuth, client: org.imdtv.iptvtv.data.addons.AddonClient) : this(authKey to auth, skip, client)
 
-    private suspend fun get(url: String) = http.json(json, Request.Builder().url(url).header("Accept", "application/json").build())
+    private var addonCache: List<StremioAddon>? = null
+    /** The add-ons, in priority order. */
+    suspend fun addons() = if (account == null) addonList() else addonCache ?: addonList().also { addonCache = it }
+    private suspend fun catalogs(kind: Kind) = addons().flatMap { a -> a.catalogs.filter { it.kind == kind && it.key !in skip }.map { a to it } }
 
     /** Every page of a catalog, up to [MAX] titles (Cinemeta's Popular never ends). */
     private suspend fun items(a: StremioAddon, c: StremioCatalog, fetched: (Int, Int?) -> Unit = { _, _ -> }): List<JsonElement> {
         val out = ArrayList<JsonElement>()
         while (out.size < MAX) {
-            val page = get("${a.base}/catalog/${c.type}/${c.id}" + (if (out.isEmpty()) "" else "/skip=${out.size}") + ".json").arr("metas")
+            val page = client.catalog(a, c, skip = out.size)
             if (page.isEmpty()) break
             out += page
             fetched(minOf(out.size, MAX), null)
-            if (page.size < 10) break // a short page is the last
+            if (page.size < 10 || !c.skip && out.size > page.size) break // a short page is the last; no skip = one page
         }
         return out.take(MAX)
     }
 
     private fun year(m: JsonElement?) = (m.str("releaseInfo") ?: m.str("year"))?.take(4)?.toIntOrNull()
     private fun rating(m: JsonElement?) = (m as? JsonObject)?.get("imdbRating")?.let { (it as? JsonPrimitive)?.doubleOrNull ?: it.jsonPrimitive.contentOrNull?.toDoubleOrNull() }
-    private fun movie(m: JsonElement, cat: String?) = Movie(m.str("id")!!, cat, m.str("name").orEmpty(), m.str("poster"), year(m), rating(m), "${STREMIO_PLAY}movie/${m.str("id")}")
-    private fun series(m: JsonElement, cat: String?) = Series(m.str("id")!!, cat, m.str("name").orEmpty(), m.str("poster"), year(m), rating(m))
+    fun movie(m: JsonElement, cat: String?) = Movie(m.str("id")!!, cat, m.str("name").orEmpty(), m.str("poster"), year(m), rating(m), "${STREMIO_PLAY}movie/${m.str("id")}")
+    fun series(m: JsonElement, cat: String?) = Series(m.str("id")!!, cat, m.str("name").orEmpty(), m.str("poster"), year(m), rating(m))
 
     /** The same title in several catalogs is kept once, in the first (a title has one category). */
     private suspend fun <T> list(kind: Kind, make: (JsonElement, String) -> T): List<T> = coroutineScope {
-        catalogs(kind).map { (a, c) -> async { c.key to runCatching { items(a, c) }.getOrElse { android.util.Log.w("Stremio", "${a.name} ${c.name} failed: $it"); emptyList() } } }.awaitAll()
+        catalogs(kind).map { (a, c) -> async { c.key to runCatching { items(a, c) }.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; android.util.Log.w("Stremio", "${a.name} ${c.name} failed: ${it.message}"); emptyList() } } }.awaitAll()
             .flatMap { (key, metas) -> metas.filter { it.str("id") != null }.map { it.str("id")!! to make(it, key) } }
             .distinctBy { it.first }.map { it.second }
     }
@@ -220,24 +269,23 @@ class StremioSource(private val authKey: String, private val skip: Set<String>, 
     override suspend fun seriesIn(cat: String, since: Long?, fetched: (Int, Int?) -> Unit) = catalog(Kind.SERIES, cat, fetched) { m, c -> series(m, c) }
     private suspend fun <T> catalog(kind: Kind, cat: String, fetched: (Int, Int?) -> Unit, make: (JsonElement, String) -> T): LibraryPage<T> {
         val (a, c) = catalogs(kind).first { it.second.key == cat }
-        val metas = runCatching { items(a, c, fetched) }.getOrElse { android.util.Log.w("Stremio", "${a.name} ${c.name} failed: $it"); emptyList() }
+        val metas = runCatching { items(a, c, fetched) }.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; android.util.Log.w("Stremio", "${a.name} ${c.name} failed: ${it.message}"); emptyList() }
         return metas.filter { it.str("id") != null }.map { make(it, cat) }.let { LibraryPage(it, it.size, changesOnly = false) }
     }
 
-    private suspend fun meta(type: String, id: String): JsonElement? =
-        addons().filter { it.serves("meta", type, id) }.firstNotNullOfOrNull { a -> runCatching { (get("${a.base}/meta/$type/$id.json") as? JsonObject)?.get("meta") }.getOrNull() }
+    private suspend fun meta(type: String, id: String): JsonElement? = client.meta(addons(), type, id)
 
     private fun List<JsonElement>.names() = mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.joinToString().ifEmpty { null }
 
     override suspend fun movieDetail(id: String): MovieDetail {
-        val m = meta("movie", id) ?: throw StremioException(404, "no details for $id")
+        val m = meta("movie", id) ?: throw StremioException(404, "no details")
         val mins = m.str("runtime")?.takeWhile { it.isDigit() }?.toIntOrNull()
         return MovieDetail(movie(m, null), m.str("background"), m.str("description"), m.arr("genres").names(), m.arr("director").names(),
             m.arr("cast").take(6).names(), mins?.times(60))
     }
 
     override suspend fun seriesDetail(id: String): SeriesDetail {
-        val m = meta("series", id) ?: throw StremioException(404, "no details for $id")
+        val m = meta("series", id) ?: throw StremioException(404, "no details")
         val eps = m.arr("videos").mapNotNull { v ->
             val vid = v.str("id") ?: return@mapNotNull null
             val season = (v as JsonObject)["season"]?.jsonPrimitive?.intOrNull ?: 0
@@ -247,21 +295,32 @@ class StremioSource(private val authKey: String, private val skip: Set<String>, 
         return SeriesDetail(series(m, null), m.str("background"), m.str("description"), m.arr("genres").names(), eps)
     }
 
-    /** The first direct link the account's stream add-ons give for [play] (a [STREMIO_PLAY] link), in add-on order; null if none. */
-    suspend fun stream(play: String): String? {
-        val (type, id) = play.removePrefix(STREMIO_PLAY).split('/', limit = 2).takeIf { it.size == 2 } ?: return null
-        for (a in addons().filter { it.serves("stream", type, id) }) {
-            val streams = runCatching { get("${a.base}/stream/$type/$id.json").arr("streams") }
-                .onFailure { android.util.Log.w("Stremio", "${a.name} streams failed: $it") }.getOrNull() ?: continue
-            // A torrent (infoHash), YouTube id or outside link can't play here; a direct http(s) link can.
-            streams.firstNotNullOfOrNull { s -> s.str("url")?.takeIf { it.startsWith("http") } }?.let { return it }
-        }
-        return null
+    /** A catalog or search entry as a poster card; null without an id or a name. */
+    fun card(m: JsonElement): AddonCard? {
+        val id = m.str("id") ?: return null
+        val name = m.str("name") ?: return null
+        return AddonCard(id, name, m.str("poster"), year(m), rating(m))
+    }
+
+    /** "stremio:movie/tt123" → ("movie", "tt123"); null for another link. */
+    fun target(play: String): Pair<String, String>? =
+        play.takeIf { it.startsWith(STREMIO_PLAY) }?.removePrefix(STREMIO_PLAY)?.split('/', limit = 2)?.takeIf { it.size == 2 }?.let { it[0] to it[1] }
+
+    /** Every stream add-on's answers for [play], as they arrive (see AddonClient.streams). */
+    suspend fun streams(play: String): kotlinx.coroutines.flow.Flow<List<org.imdtv.iptvtv.data.addons.StreamGroup>> {
+        val (type, id) = target(play) ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+        return client.streams(addons(), type, id)
+    }
+
+    /** Subtitles from the subtitle add-ons for [play]. */
+    suspend fun subtitles(play: String): List<org.imdtv.iptvtv.data.addons.AddonSubtitle> {
+        val (type, id) = target(play) ?: return emptyList()
+        return client.subtitles(addons(), type, id)
     }
 
     // shortcut: only titles in the chosen catalogs can show (the rest have no row here); add them to a category if people ask.
-    override suspend fun resumePoints() = auth.continueWatching(authKey)
-    override suspend fun reportProgress(p: ProgressReport) = auth.saveProgress(authKey, p)
+    override suspend fun resumePoints() = account?.let { (key, auth) -> auth.continueWatching(key) }.orEmpty()
+    override suspend fun reportProgress(p: ProgressReport) { account?.let { (key, auth) -> auth.saveProgress(key, p) } }
 
     companion object { const val MAX = 500 }
 }

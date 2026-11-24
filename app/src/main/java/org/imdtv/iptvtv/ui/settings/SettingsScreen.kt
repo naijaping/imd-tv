@@ -57,7 +57,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import org.imdtv.iptvtv.ui.FocusBox
 
 enum class SettingsGroup(val title: String, @StringRes val labelRes: Int) {
-    PLAYLISTS("Playlists", R.string.set_b_group_playlists), MEDIA_SERVERS("Media servers", R.string.set_b_group_media_servers), CHANNELS("Channels & categories", R.string.set_b_group_channels),
+    PLAYLISTS("Playlists", R.string.set_b_group_playlists), MEDIA_SERVERS("Media servers", R.string.set_b_group_media_servers), ADDONS("Addons", R.string.set_c_group_addons), CHANNELS("Channels & categories", R.string.set_b_group_channels),
     EPG("TV guide (EPG)", R.string.set_b_group_epg), VOD("Movies & Series", R.string.set_b_group_vod), PLAYBACK("Playback", R.string.set_b_group_playback),
     APPEARANCE("Appearance", R.string.set_b_group_appearance), BEHAVIOUR("App behaviour", R.string.set_b_group_behaviour),
     BACKUP("Backup & sync", R.string.set_b_group_backup), ABOUT("About", R.string.set_b_group_about),
@@ -86,6 +86,9 @@ fun SettingsScreen(vm: SettingsViewModel, onAddPlaylist: () -> Unit, onEditPlayl
     var reopenRecording by remember { mutableStateOf(false) }
     val recordingOpener = remember { FocusRequester() }
     var syncOpen by remember { mutableStateOf(false) }
+    // Settings › Addons: the add-on whose page is open (its manifest URL), and the one to refocus on closing it.
+    var addonOpen by remember { mutableStateOf<String?>(null) }
+    var reopenAddon by remember { mutableStateOf<String?>(null) }
     var reopenSync by remember { mutableStateOf(false) }
     val syncOpener = remember { FocusRequester() }
     var backupOpen by remember { mutableStateOf(false) }
@@ -188,7 +191,7 @@ fun SettingsScreen(vm: SettingsViewModel, onAddPlaylist: () -> Unit, onEditPlayl
                     FocusBox(
                         onClick = { runCatching { rowsFocus.requestFocus() } },
                         modifier = if (g == group) Modifier.focusRequester(groupFocus) else Modifier,
-                        onFocused = { if (g != group) { page = null; playlist = null; sourcesOpen = false; recordingOpen = false; syncOpen = false; backupOpen = false; server = null }; group = g },
+                        onFocused = { if (g != group) { page = null; playlist = null; sourcesOpen = false; recordingOpen = false; syncOpen = false; backupOpen = false; server = null; addonOpen = null }; group = g },
                     ) { f ->
                         Text(
                             stringResource(g.labelRes), fontSize = 15.sp, color = if (f && !parked) Color.Black else if (g == group) Color.White else LocalTheme.current.colors.muted,
@@ -233,7 +236,8 @@ fun SettingsScreen(vm: SettingsViewModel, onAddPlaylist: () -> Unit, onEditPlayl
             if (recordingOpen) org.imdtv.iptvtv.recording.RecordingPage(vm, pane, rowsFocus) { park(); reopenRecording = true; recordingOpen = false }
             if (syncOpen) SyncPage(vm, pane, rowsFocus) { park(); reopenSync = true; syncOpen = false }
             if (backupOpen) BackupPage(vm, pane, rowsFocus) { park(); reopenBackup = true; backupOpen = false }
-            if (page == null && playlist == null && server == null && !sourcesOpen && !recordingOpen && !syncOpen && !backupOpen) Column(pane.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            addonOpen?.let { url -> key(url) { AddonPage(vm, url, pane, rowsFocus) { park(); reopenAddon = url; addonOpen = null } } }
+            if (page == null && playlist == null && server == null && addonOpen == null && !sourcesOpen && !recordingOpen && !syncOpen && !backupOpen) Column(pane.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val syncNow by vm.sync.state.collectAsState()
                 syncNow.master?.takeIf { syncNow.role == org.imdtv.iptvtv.data.sync.SyncRole.FOLLOWER }?.let {
                     Text(stringResource(R.string.set_b_following, it.name), fontSize = 14.sp, color = LocalTheme.current.colors.muted)
@@ -244,6 +248,7 @@ fun SettingsScreen(vm: SettingsViewModel, onAddPlaylist: () -> Unit, onEditPlayl
                 when (group) {
                     SettingsGroup.PLAYLISTS -> PlaylistGroupRows(vm, first, playlistOpeners, onAddPlaylist) { park(); playlist = it }
                     SettingsGroup.MEDIA_SERVERS -> MediaServerRows(vm, first, serverOpeners) { park(); server = it }
+                    SettingsGroup.ADDONS -> AddonRows(vm, first, reopenAddon, { reopenAddon = null }) { park(); addonOpen = it }
                     SettingsGroup.EPG -> EpgGroupRows(vm, first, Modifier.focusRequester(sourcesOpener)) { park(); sourcesOpen = true }
                     SettingsGroup.CHANNELS -> ChannelGroupRows(vm, first, openers) { park(); page = it }
                     SettingsGroup.VOD -> ChoiceRow(stringResource(R.string.set_b_vod_sort), stringResource(R.string.set_b_vod_sort_expl), org.imdtv.iptvtv.data.settings.VodSort.entries, s.vodSort,

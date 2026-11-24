@@ -1,0 +1,32 @@
+{
+ "metas": [
+  {
+   "id": "tt6611324",
+   "type": "movie",
+   "name": "The Bodyguard",
+   "poster": "https://images.metahub.space/poster/small/tt6611324/img",
+   "releaseInfo": "2026",
+   "imdbRating": ""
+  },
+  {
+   "id": "tt33764258",
+   "type": "movie",
+   "name": "The Odyssey",
+   "poster": "https://images.metahub.space/poster/small/tt33764258/img",
+   "releaseInfo": "2026",
+   "imdbRating": "8.4"
+  },
+  {
+   "id": "tt45368240",
+   "type": "movie",
+   "name": "You Can See Everything",
+   "poster": "https://images.metahub.space/poster/small/tt45368240/img",
+   "releaseInfo": "2026",
+   "imdbRating": "7.9"
+  }
+ ],
+ "hasMore": true,
+ "cacheMaxAge": 14400,
+ "staleRevalidate": 3600,
+ "staleError": 3600
+}

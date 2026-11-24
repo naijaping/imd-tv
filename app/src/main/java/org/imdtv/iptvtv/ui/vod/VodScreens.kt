@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.imdtv.iptvtv.data.db.CategoryEntity
 import org.imdtv.iptvtv.data.model.Episode
 import org.imdtv.iptvtv.data.model.Kind
@@ -96,6 +97,9 @@ fun VodHomeScreen(vm: VodViewModel, nav: @Composable () -> Unit, onOpen: (VodIte
     val query by vm.query.collectAsState()
     val matches by vm.matches.collectAsState()
     val others by vm.otherPlaylists.collectAsState()
+    val addonRows by vm.addonRows.collectAsState()
+    val addonFound by vm.addonMatches.collectAsState()
+    val addonSearching by vm.addonSearching.collectAsState()
     var railOpen by remember { mutableStateOf(false) }
     val firstItem = remember { FocusRequester() }
     val railFocus = remember { FocusRequester() }
@@ -137,9 +141,10 @@ fun VodHomeScreen(vm: VodViewModel, nav: @Composable () -> Unit, onOpen: (VodIte
         val openRail = { railOpen = true }
         val rowToTop = with(androidx.compose.ui.platform.LocalDensity.current) { remember { rowToTop(6.dp.toPx()) } }
         Box(Modifier.padding(start = 50.dp, top = 260.dp).fillMaxSize()) {
-            val found = matches
+            // The playlists' matches, then the add-ons' (their search catalogs answer a moment later).
+            val found = matches?.let { local -> local + addonFound.orEmpty().filter { a -> local.none { it.id == a.id } } }
             if (found != null) {
-                if (found.isEmpty()) Text(stringResource(R.string.vod_no_matches), fontSize = 15.sp, color = LocalTheme.current.colors.muted)
+                if (found.isEmpty()) Text(stringResource(if (addonSearching) R.string.vod_searching_addons else R.string.vod_no_matches), fontSize = 15.sp, color = LocalTheme.current.colors.muted)
                 else androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides rowToTop) { LazyVerticalGrid(GridCells.Fixed(7), verticalArrangement = Arrangement.spacedBy(14.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 8.dp, top = 6.dp, end = 42.dp, bottom = 20.dp),
                     modifier = Modifier.fillMaxSize().offset(x = (-8).dp)) {
@@ -190,6 +195,10 @@ fun VodHomeScreen(vm: VodViewModel, nav: @Composable () -> Unit, onOpen: (VodIte
                                 vm, onOpen, openRail, claim, poster = poster, gap = gap, sideways = sideways)
                         }
                     }
+                    // Stremio add-ons (Settings › Addons): each catalog a row, "Cinemeta – Popular", in add-on order.
+                    itemsIndexed(addonRows, key = { _, r -> "a${r.key}" }) { i, r ->
+                        AddonPosterRow(r, vm, firstItem.takeIf { i == 0 && favs.isEmpty() && cats.isEmpty() && others.isEmpty() }, onOpen, openRail, claim, poster, gap, sideways)
+                    }
                 } } }
             }
         }
@@ -222,7 +231,8 @@ private fun rowHeight(poster: androidx.compose.ui.unit.Dp, gap: androidx.compose
 @Composable
 private fun PosterRow(title: String, items: List<VodItem>?, focus: FocusRequester?, vm: VodViewModel, onOpen: (VodItem) -> Unit, openRail: () -> Unit, claim: @Composable () -> Unit,
                       progress: (VodItem) -> Float? = { null }, poster: androidx.compose.ui.unit.Dp = 165.dp, gap: androidx.compose.ui.unit.Dp = 18.dp,
-                      sideways: androidx.compose.foundation.gestures.BringIntoViewSpec) {
+                      sideways: androidx.compose.foundation.gestures.BringIntoViewSpec,
+                      /** A poster at this index got focus (an add-on row loads its next page near the end). */ onFocusIndex: ((Int) -> Unit)? = null) {
     Column(Modifier.padding(bottom = gap)) {
         // Fixed line height: the column's scroll-to-top offset counts on it ([ROW_TITLE]).
         Text(title, fontSize = 14.sp, lineHeight = 18.sp, maxLines = 1, fontWeight = FontWeight.SemiBold, color = Color.White, modifier = Modifier.height(ROW_TITLE))
@@ -238,12 +248,48 @@ private fun PosterRow(title: String, items: List<VodItem>?, focus: FocusRequeste
                 if (i == 0 && focus != null) claim()
                 Poster(item, Modifier.then(if (i == 0 && focus != null) Modifier.focusRequester(focus) else Modifier)
                     .onPreviewKeyEvent { if (i == 0 && leftKey(it)) { openRail(); true } else false },
-                    progress = item?.let(progress), height = poster, onFocused = { item?.let { vm.focused.value = it } }, onClick = { item?.let(onOpen) })
+                    progress = item?.let(progress), height = poster, onFocused = { item?.let { vm.focused.value = it }; onFocusIndex?.invoke(i) }, onClick = { item?.let(onOpen) })
             }
         }
         }
     }
 }
+
+/**
+ * A Stremio add-on catalog as a row: its first page, then the next (`skip=`) as focus nears the end. Its requests run
+ * in the row's scope, so scrolling it away or leaving the screen cancels them. A catalog with nothing shows no row.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun AddonPosterRow(row: VodViewModel.AddonRow, vm: VodViewModel, focus: FocusRequester?, onOpen: (VodItem) -> Unit, openRail: () -> Unit,
+                           claim: @Composable () -> Unit, poster: androidx.compose.ui.unit.Dp, gap: androidx.compose.ui.unit.Dp,
+                           sideways: androidx.compose.foundation.gestures.BringIntoViewSpec) {
+    var items by remember(row.key) { mutableStateOf<List<VodItem>?>(null) }
+    var loadingMore by remember(row.key) { mutableStateOf(false) }
+    var done by remember(row.key) { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    LaunchedEffect(row.key) {
+        val page = vm.addonPage(row, 0)
+        items = page
+        done = page.isEmpty() || !row.catalog.skip
+    }
+    if (items?.isEmpty() == true) return
+    PosterRow(row.title, items, focus, vm, onOpen, openRail, claim, poster = poster, gap = gap, sideways = sideways, onFocusIndex = { i ->
+        val list = items
+        if (list != null && !done && !loadingMore && i >= list.size - ADDON_PREFETCH) {
+            loadingMore = true
+            scope.launch {
+                try {
+                    val more = vm.addonPage(row, list.size).filter { m -> list.none { it.id == m.id } }
+                    if (more.isEmpty()) done = true else items = list + more
+                } finally { loadingMore = false }
+            }
+        }
+    })
+}
+
+/** An add-on row asks for its next page when focus is this many posters from its end. */
+private const val ADDON_PREFETCH = 6
 
 /** [item] null = a placeholder card while its row loads. */
 @Composable
@@ -386,6 +432,11 @@ fun VodDetailScreen(vm: VodViewModel, item: VodItem, onPlay: (url: String, title
     fun episodeTitle(ep: Episode) = context.getString(R.string.vod_episode_title, item.name, ep.season, ep.number)
     val play = remember { FocusRequester() }
     LaunchedEffect(item.id) { vm.loadDetail(item); withFrameNanos { }; runCatching { play.requestFocus() } }
+    // Leaving the page stops a stream list still asking the add-ons.
+    androidx.compose.runtime.DisposableEffect(item.id) { onDispose { vm.cancelStreams() } }
+    StreamPicker(vm)
+    // An add-on title (Settings › Addons) belongs to no playlist: no favourite or watched mark to keep.
+    val own = !item.isAddon
     val fav = favs.any { it.id == item.id }
     vm.learnedHeights.collectAsState().value // recompose when a height is learned
     val resolution = (d?.height ?: vm.learnedHeight(item))?.let { org.imdtv.iptvtv.player.resolutionLabel(it) }
@@ -405,8 +456,8 @@ fun VodDetailScreen(vm: VodViewModel, item: VodItem, onPlay: (url: String, title
                         Btn(stringResource(R.string.vod_btn_resume_from, duration(at)), Modifier.focusRequester(play)) { item.streamUrl?.let { onPlay(it, item.name, "", at) } }
                         Btn(stringResource(R.string.vod_btn_from_start)) { item.streamUrl?.let { onPlay(it, item.name, "", 0) } }
                     } else Btn(stringResource(R.string.vod_btn_play), Modifier.focusRequester(play)) { item.streamUrl?.let { onPlay(it, item.name, "", 0) } }
-                    Btn(stringResource(if (fav) R.string.vod_btn_favourited else R.string.vod_btn_favourite)) { vm.toggleFavourite(item) }
-                    Btn(stringResource(if (row?.completed == true) R.string.vod_btn_watched else R.string.vod_btn_mark_watched)) { vm.setWatched(item, row?.completed != true) }
+                    if (own) Btn(stringResource(if (fav) R.string.vod_btn_favourited else R.string.vod_btn_favourite)) { vm.toggleFavourite(item) }
+                    if (own) Btn(stringResource(if (row?.completed == true) R.string.vod_btn_watched else R.string.vod_btn_mark_watched)) { vm.setWatched(item, row?.completed != true) }
                 }
             }
             item.categoryId?.let { catId ->
@@ -438,8 +489,8 @@ fun VodDetailScreen(vm: VodViewModel, item: VodItem, onPlay: (url: String, title
                         Btn(stringResource(R.string.vod_btn_resume_episode, ne.season, ne.number), Modifier.focusRequester(play)) { onPlay(ne.streamUrl, ntitle!!, ne.remoteId, next.startMs) }
                         Btn(stringResource(R.string.vod_btn_from_start)) { onPlay(ne.streamUrl, ntitle!!, ne.remoteId, 0) }
                     } else Btn(stringResource(R.string.vod_btn_play_episode, ne.season, ne.number), Modifier.focusRequester(play)) { onPlay(ne.streamUrl, ntitle!!, ne.remoteId, 0) }
-                    Btn(stringResource(if (fav) R.string.vod_btn_favourited else R.string.vod_btn_favourite)) { vm.toggleFavourite(item) }
-                    if (ne != null) Btn(stringResource(R.string.vod_btn_mark_episode_watched, ne.number)) { vm.setWatched(item, true, ne.remoteId) }
+                    if (own) Btn(stringResource(if (fav) R.string.vod_btn_favourited else R.string.vod_btn_favourite)) { vm.toggleFavourite(item) }
+                    if (own && ne != null) Btn(stringResource(R.string.vod_btn_mark_episode_watched, ne.number)) { vm.setWatched(item, true, ne.remoteId) }
                 }
             }
             Column(Modifier.padding(start = 50.dp, top = 300.dp)) {
@@ -459,7 +510,7 @@ fun VodDetailScreen(vm: VodViewModel, item: VodItem, onPlay: (url: String, title
                     items(eps.filter { it.season == sel }, key = { it.remoteId }) { ep ->
                         val r = seriesRows.find { it.episode == ep.remoteId }
                         FocusBox(onClick = { onPlay(ep.streamUrl, episodeTitle(ep), ep.remoteId, resumeAt(r)) },
-                            modifier = Modifier.width(216.dp).onLongOk { menuFor = ep }) { f ->
+                            modifier = Modifier.width(216.dp).then(if (own) Modifier.onLongOk { menuFor = ep } else Modifier)) { f ->
                             Column {
                                 Box(
                                     Modifier.graphicsLayer { val s = if (f) 1.06f else 1f; scaleX = s; scaleY = s }

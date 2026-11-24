@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import org.imdtv.iptvtv.IptvApp
 import org.imdtv.iptvtv.data.db.CategoryEntity
 import org.imdtv.iptvtv.data.db.FavouriteEntity
@@ -53,6 +55,9 @@ data class VodDetail(
     val backdrop: String?, val plot: String?, val genre: String?, val director: String?, val cast: String?,
     val durationSecs: Int?, val episodes: List<Episode> = emptyList(), val height: Int? = null,
 )
+
+/** A title from a Stremio add-on on the Addons page (not in any playlist). */
+val VodItem.isAddon get() = providerId == VodViewModel.ADDONS_PROVIDER
 
 fun MovieEntity.item() = VodItem(id, Kind.MOVIE, remoteId, name, poster, year, rating, categoryId, streamUrl, providerId)
 fun SeriesEntity.item() = VodItem(id, Kind.SERIES, remoteId, name, poster, year, rating, categoryId, null, providerId)
@@ -219,13 +224,17 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
     fun loadDetail(item: VodItem) {
         if (details.value.containsKey(item.id)) return
         viewModelScope.launch {
-            val p = providerOf(item) ?: return@launch
-            // M3U has no movie details, and asking would download and hold the whole playlist; Stalker has no detail call.
-            if (item.kind == Kind.MOVIE && !p.type.xtream && !p.type.mediaServer) return@launch
+            // An add-on title: details from the first add-on serving meta for its type and id.
+            val src = if (item.isAddon) c.addonSource else {
+                val p = providerOf(item) ?: return@launch
+                // M3U has no movie details, and asking would download and hold the whole playlist; Stalker has no detail call.
+                if (item.kind == Kind.MOVIE && !p.type.xtream && !p.type.mediaServer) return@launch
+                source(p)
+            }
             runCatching {
-                if (item.kind == Kind.MOVIE) source(p).movieDetail(item.remoteId).let {
+                if (item.kind == Kind.MOVIE) src.movieDetail(item.remoteId).let {
                     VodDetail(it.backdrop, it.plot, it.genre, it.director, it.cast, it.durationSecs, height = it.height)
-                } else source(p).seriesDetail(item.remoteId).let {
+                } else src.seriesDetail(item.remoteId).let {
                     VodDetail(it.backdrop, it.plot, it.genre, null, null, null, it.episodes)
                 }
             }.onSuccess { d -> details.value = details.value + (item.id to d) }
@@ -238,6 +247,7 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         provider.value?.takeIf { it.id == item.providerId } ?: c.db.providerDao().get(item.providerId)
 
     fun toggleFavourite(item: VodItem) {
+        if (item.isAddon) return // no playlist to keep it under; the detail page hides the button
         viewModelScope.launch {
             if (favourites.value.any { it.id == item.id }) c.db.favouriteDao().remove(item.providerId, item.kind, item.id)
             else c.db.favouriteDao().add(FavouriteEntity(item.providerId, item.kind, item.id, System.currentTimeMillis()))
@@ -250,6 +260,7 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Mark watched (Play then starts over) or unwatched (forgets the position too). */
     fun setWatched(item: VodItem, watched: Boolean, episode: String = "") {
+        if (item.isAddon) return
         viewModelScope.launch {
             val row = ProgressEntity(item.providerId, item.kind, item.id, 0, progressOf(item, episode)?.durationMs ?: 0,
                 System.currentTimeMillis(), completed = watched, episode = episode)
@@ -275,21 +286,119 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
      * Plays [url] from [startMs]; for [item] (the movie, or the series [episode] belongs to: its remoteId) remembers
      * the picture height once known, and where it's left (see WatchProgress).
      */
-    fun play(url: String, item: VodItem? = null, episode: String = "", startMs: Long = 0) {
+    fun play(url: String, item: VodItem? = null, episode: String = "", startMs: Long = 0, title: String = item?.name.orEmpty(), onStart: () -> Unit = {}) {
         viewModelScope.launch {
-            val p = item?.let { providerOf(it) } ?: provider.value
+            // An add-on title has no playlist: nothing of the one in use (login, progress) applies to it.
+            val p = if (item?.isAddon == true) null else item?.let { providerOf(it) } ?: provider.value
             // Parental controls: a locked category's titles need the PIN. shortcut: no VOD age ratings (list APIs carry none), add them if a provider field proves reliable.
             val cat = item?.categoryId
             if (cat != null) {
                 val locked = c.settings.settings.first().let { s -> s.parentalOn && s.parentalLocked(c.db.categoryDao().get(cat)?.parentalLock == true, null) }
                 if (!c.parental.allow(locked, "v${item.kind}${item.id}", Long.MAX_VALUE, ask = true)) return@launch
             }
-            val real = if (url.startsWith(org.imdtv.iptvtv.data.source.STREMIO_PLAY) && p != null) {
-                runCatching { (source(p) as? org.imdtv.iptvtv.data.source.StremioSource)?.stream(url) }.getOrNull()
-                    ?: return@launch run { android.widget.Toast.makeText(app, R.string.vod_stremio_no_stream, android.widget.Toast.LENGTH_LONG).show() }
-            } else url
-            startPlay(p, real, item, episode, startMs)
+            if (url.startsWith(org.imdtv.iptvtv.data.source.STREMIO_PLAY)) {
+                // A Stremio account's titles ask its add-ons; an add-on title (or no Stremio playlist) the Addons page's.
+                val src = (p?.let { source(it) } as? org.imdtv.iptvtv.data.source.StremioSource) ?: c.addonSource
+                chooseStream(src, url, title, p, item, episode, startMs, onStart)
+                return@launch
+            }
+            startPlay(p, url, item, episode, startMs)
+            onStart()
         }
+    }
+
+    // --- Stremio add-on streams: every add-on asked at once, the list filling in as they answer ---
+
+    /** The stream list on the detail page: [groups] in add-on order; [auto]: "Play the first stream" is on. */
+    /** [asked]: the add-ons serving streams are known ([groups] empty then = none of them does). */
+    data class StreamChoice(val title: String, val groups: List<org.imdtv.iptvtv.data.addons.StreamGroup>, val auto: Boolean, val asked: Boolean = false)
+    val streamChoice = MutableStateFlow<StreamChoice?>(null)
+    private var choiceJob: kotlinx.coroutines.Job? = null
+    private var onChosen: ((org.imdtv.iptvtv.data.addons.AddonStream) -> Unit)? = null
+
+    private suspend fun chooseStream(src: org.imdtv.iptvtv.data.source.StremioSource, url: String, title: String, p: ProviderEntity?, item: VodItem?,
+                             episode: String, startMs: Long, onStart: () -> Unit) {
+        cancelStreams()
+        val auto = c.settings.settings.first().autoPlayFirstStream
+        // Subtitles are asked for at the same time; by the time a stream is picked they've usually answered.
+        val subs = viewModelScope.async { runCatching { src.subtitles(url) }.getOrDefault(emptyList()) }
+        var started = false
+        onChosen = { s ->
+            val link = s.playUrl
+            if (!started && link != null) {
+                started = true
+                choiceJob?.cancel(); streamChoice.value = null; onChosen = null
+                viewModelScope.launch {
+                    val extra = kotlinx.coroutines.withTimeoutOrNull(1_500) { subs.await() }.orEmpty()
+                    val all = (s.subtitles + extra).distinctBy { it.url }.map { org.imdtv.iptvtv.player.ExternalSubtitle(it.url, it.lang) }
+                    startPlay(p, link, item, episode, startMs, all)
+                    onStart()
+                }
+            }
+        }
+        streamChoice.value = StreamChoice(title, emptyList(), auto)
+        choiceJob = viewModelScope.launch {
+            src.streams(url).collect { groups ->
+                if (streamChoice.value == null) return@collect // closed meanwhile
+                streamChoice.value = StreamChoice(title, groups, auto, asked = true)
+                if (auto) (org.imdtv.iptvtv.data.addons.autoPick(groups) as? org.imdtv.iptvtv.data.addons.AutoPick.Play)?.let { onChosen?.invoke(it.stream) }
+            }
+        }
+    }
+
+    /** OK on a stream in the list. */
+    fun pickStream(s: org.imdtv.iptvtv.data.addons.AddonStream) { onChosen?.invoke(s) }
+
+    /** Back on the list (or leaving the page): stops asking the add-ons. */
+    fun cancelStreams() { choiceJob?.cancel(); choiceJob = null; streamChoice.value = null; onChosen = null }
+
+    // --- Stremio add-on catalogs as home rows (Settings › Addons) ---
+
+    /** A catalog row: "Cinemeta – Popular", in add-on order. */
+    data class AddonRow(val key: String, val title: String, val addon: org.imdtv.iptvtv.data.source.StremioAddon, val catalog: org.imdtv.iptvtv.data.source.StremioCatalog)
+
+    val addonRows: StateFlow<List<AddonRow>> = combine(c.addons.enabled, kind) { list, k ->
+        list.flatMapIndexed { i, a -> a.catalogs.filter { it.kind == k }.map { AddonRow("$i/${it.key}", "${a.name} – ${it.name}", a, it) } }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** One page of [row] from [skip]; the caller's scope cancels it when the row leaves the screen. Failures give an empty page. */
+    suspend fun addonPage(row: AddonRow, skip: Int): List<VodItem> =
+        try { c.addonClient.catalog(row.addon, row.catalog, skip).mapNotNull { addonItem(it, row.catalog.kind ?: kind.value) } }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { Log.w("IptvVod", "${row.addon.name} – ${row.catalog.name}: ${e.message}"); emptyList() }
+
+    private fun addonItem(m: kotlinx.serialization.json.JsonElement, k: Kind): VodItem? = c.addonSource.card(m)?.let { card ->
+        VodItem(addonItemId(k, card.id), k, card.id, card.name, card.poster, card.year, card.rating, null,
+            if (k == Kind.MOVIE) "${org.imdtv.iptvtv.data.source.STREMIO_PLAY}movie/${card.id}" else null, ADDONS_PROVIDER)
+    }
+
+    /** The search bar on Movies or Series (no category picked) also asks every add-on catalog that takes a search. */
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    val addonMatches: StateFlow<List<VodItem>?> = combine(query, kind, gridCategory) { q, k, g -> Triple(q, k, g) }
+        .debounce(400).distinctUntilChanged()
+        .flatMapLatest { (q, k, g) ->
+            if (g != null || org.imdtv.iptvtv.data.search.queryWords(q).isEmpty()) flowOf<List<VodItem>?>(null)
+            else kotlinx.coroutines.flow.flow<List<VodItem>?> {
+                emit(emptyList()) // searching: an empty list (not null) while the add-ons answer
+                emit(addonSearch(k, q.trim()))
+            }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    /** Add-on searches running (a counter: a cancelled one finishing late mustn't clear the newer one's flag). */
+    private val searchesRunning = java.util.concurrent.atomic.AtomicInteger()
+    val addonSearching = MutableStateFlow(false)
+
+    private suspend fun addonSearch(k: Kind, q: String): List<VodItem> = kotlinx.coroutines.coroutineScope {
+        addonSearching.value = searchesRunning.incrementAndGet() > 0
+        try {
+            c.addons.enabledNow().flatMap { a -> a.searchCatalogs.filter { it.kind == k }.map { a to it } }.map { (a, cat) ->
+                async {
+                    kotlinx.coroutines.withTimeoutOrNull(ADDON_SEARCH_MS) {
+                        try { c.addonClient.catalog(a, cat, search = q) } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                        catch (e: Exception) { Log.w("IptvVod", "${a.name} search failed: ${e.message}"); null }
+                    }.orEmpty()
+                }
+            }.awaitAll().flatten().mapNotNull { addonItem(it, k) }.distinctBy { it.remoteId }
+        } finally { addonSearching.value = searchesRunning.decrementAndGet() > 0 }
     }
 
     val parentalOn: StateFlow<Boolean> = c.settings.settings.map { it.parentalOn }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -298,9 +407,11 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { if (on || c.parental.askPin()) c.db.categoryDao().setParentalLock(cat.id, on) }
     }
 
-    private fun startPlay(p: ProviderEntity?, url: String, item: VodItem?, episode: String, startMs: Long) {
+    private fun startPlay(p: ProviderEntity?, url: String, item: VodItem?, episode: String, startMs: Long,
+                          subtitles: List<org.imdtv.iptvtv.player.ExternalSubtitle> = emptyList()) {
         player.play(url, p?.userAgent, p?.login(), vod = true, startMs = startMs,
-            parallel = p?.type == org.imdtv.iptvtv.data.db.ProviderType.PLEX || p?.type == org.imdtv.iptvtv.data.db.ProviderType.JELLYFIN)
+            parallel = p?.type == org.imdtv.iptvtv.data.db.ProviderType.PLEX || p?.type == org.imdtv.iptvtv.data.db.ProviderType.JELLYFIN,
+            subtitles = subtitles)
         learn?.cancel()
         if (item == null) return
         p?.let { c.watchProgress.start(it.id, item.kind, item.id, episode, url) }
@@ -317,5 +428,11 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         const val GRID_LIMIT = 600
         /** The Continue watching pseudo-category (not a row in the category table). */
         const val CONTINUE_ID = -2L
+        /** The provider id of Stremio add-on titles (Settings › Addons): no playlist row, never the one in use. */
+        const val ADDONS_PROVIDER = -7L
+        const val ADDON_SEARCH_MS = 10_000L
+
+        /** A stable id for an add-on title, far below every database id and the pseudo ids above. */
+        fun addonItemId(k: Kind, remoteId: String): Long = -(1L shl 33) - (("${k.name}|$remoteId").hashCode().toLong() and 0xffffffffL)
     }
 }
