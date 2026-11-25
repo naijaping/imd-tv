@@ -191,7 +191,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     val focused = MutableStateFlow<ChannelEntity?>(null)
 
     val settings: StateFlow<AppSettings> = c.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
-    val guideUpdating: StateFlow<Boolean> = org.imdtv.iptvtv.work.EpgRefreshWorker.updating(app).stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val guideUpdating: StateFlow<Boolean> = org.imdtv.iptvtv.work.EpgRefreshWorker.updating(app, visibleOnly = true).stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val logoSource: StateFlow<List<LogoKind>> = c.settings.settings.map { it.logoOrder }.distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings().logoOrder)
 

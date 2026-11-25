@@ -118,6 +118,8 @@ data class SearchRow(val id: Long, val name: String, val customName: String?, va
 
 @Dao
 abstract class ChannelDao {
+    /** The playlist's channel ids, sorted: what a sync changed (guide updates on a playlist change compare them). */
+    @Query("SELECT remoteId FROM channel WHERE providerId = :providerId ORDER BY remoteId") abstract suspend fun sortedRemoteIds(providerId: Long): List<String>
     @Query(
         """SELECT * FROM channel WHERE categoryId = :categoryId AND hidden = 0 AND mergedInto IS NULL
            ORDER BY sortOrder IS NULL, sortOrder, coalesce(customNumber, number) IS NULL, coalesce(customNumber, number), coalesce(customName, name)"""
@@ -374,6 +376,9 @@ abstract class ProgrammeDao {
 
 @Dao
 interface EpgDao {
+    /** Any guide data for the playlist at all (else its first guide download is due). */
+    @Query("SELECT EXISTS(SELECT 1 FROM programme WHERE sourceId IN (SELECT id FROM epg_source WHERE providerId = :providerId))")
+    suspend fun hasProgrammes(providerId: Long): Boolean
     @Insert suspend fun insertSource(s: EpgSourceEntity): Long
     @Update suspend fun updateSource(s: EpgSourceEntity)
     @Query("SELECT * FROM epg_source WHERE providerId = :providerId ORDER BY priority")

@@ -83,7 +83,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     val guideUpdating: StateFlow<Boolean> = EpgRefreshWorker.updating(app).stateIn(viewModelScope, SharingStarted.Eagerly, false)
     /** A second press while one runs used to REPLACE (cancel and restart) it. */
-    fun refreshGuide() { if (!guideUpdating.value) EpgRefreshWorker.runNow(getApplication()) }
+    fun refreshGuide() { if (!guideUpdating.value) EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.USER_REFRESH) }
     /** Re-links only; nothing is downloaded. */
     fun setBorrowSiblingGuide(on: Boolean) = launchFor { p ->
         c.settings.update { it.copy(borrowSiblingGuide = on) }
@@ -96,10 +96,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     /** EPG sources › an open-source file On/Off; the refresh re-matches without (or with) it. */
     fun setGuideOn(url: String, on: Boolean) {
-        viewModelScope.launch { c.settings.update { it.copy(guidesOff = if (on) it.guidesOff - url else it.guidesOff + url) }; EpgRefreshWorker.runNow(getApplication()) }
+        viewModelScope.launch { c.settings.update { it.copy(guidesOff = if (on) it.guidesOff - url else it.guidesOff + url) }; EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.SETTINGS_CHANGE) }
     }
     fun setGuideOrder(order: List<GuideKind>) {
-        viewModelScope.launch { c.settings.update { it.copy(guideOrder = order) }; EpgRefreshWorker.runNow(getApplication()) }
+        viewModelScope.launch { c.settings.update { it.copy(guideOrder = order) }; EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.SETTINGS_CHANGE) }
     }
 
     // --- Playlists and TV guide ---
@@ -114,7 +114,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun renameSource(id: Long, name: String) { viewModelScope.launch { c.db.epgDao().renameSource(id, name.trim().ifEmpty { null }) } }
     fun setOffset(id: Long, minutes: Int) { viewModelScope.launch { c.db.epgDao().setOffset(id, minutes) } }
     fun addSource(providerId: Long, url: String) {
-        viewModelScope.launch { c.providerRepository.addEpgSource(providerId, url.trim(), null); EpgRefreshWorker.runNow(getApplication()) }
+        viewModelScope.launch { c.providerRepository.addEpgSource(providerId, url.trim(), null); EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.SETTINGS_CHANGE) }
     }
     fun removeSource(providerId: Long, id: Long) {
         viewModelScope.launch { c.providerRepository.removeEpgSource(id); c.epgMatcher.rematch(providerId) }
@@ -155,7 +155,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val r = c.providerRepository.syncNow(id) { show(it) }
                 c.epgMatcher.rematch(id)
-                if (settings.value.epgUpdateOnPlaylistChange) EpgRefreshWorker.runNow(getApplication())
+                if (settings.value.epgUpdateOnPlaylistChange) EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.PLAYLIST_CHANGED)
                 show(r.summary())
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -518,7 +518,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             c.backup.restoreSettings(b.settings)
-            EpgRefreshWorker.runNow(getApplication())
+            EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.RESTORE)
             backupStatus.value = if (failed.isEmpty()) str(R.string.set_b_restored, applied, skipped)
                 else str(R.string.set_b_restored_failed, applied, skipped, failed.joinToString())
             pendingRestore.value = null

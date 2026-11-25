@@ -27,13 +27,21 @@ class CatalogueSyncWorker(context: Context, params: WorkerParameters) : Coroutin
         // 30 min early still counts: the periodic run may start a little before the period is up.
         val maxAge = c.settings.settings.first().playlistUpdateHours.hours - 30.minutes
         for (p in c.db.providerDao().all()) {
+            // "Update when the playlist changes": only when it did — its live channels or its guide addresses. New
+            // channels match from the guide already on the box (rematch below); a same-as-before sync downloads nothing.
+            val before = fingerprint(c, p.id)
             runCatching { c.providerRepository.syncIfStale(p.id, maxAge) }
-                .onSuccess { if (it != null) { c.epgMatcher.rematch(p.id); synced = true } }
+                .onSuccess { if (it != null) { c.epgMatcher.rematch(p.id); if (fingerprint(c, p.id) != before) synced = true } }
                 .onFailure { failed = true; Log.w(TAG, "Catalogue sync failed for provider ${p.id}", it) }
         }
-        if (synced && c.settings.settings.first().epgUpdateOnPlaylistChange) EpgRefreshWorker.runNow(applicationContext, automatic = true)
+        if (synced && c.settings.settings.first().epgUpdateOnPlaylistChange)
+            EpgRefreshWorker.runNow(applicationContext, org.imdtv.iptvtv.work.GuideUpdateReason.PLAYLIST_CHANGED, automatic = true)
         return if (failed) Result.retry() else Result.success()
     }
+
+    /** What the guide depends on in a playlist: its live channels' ids and its guide addresses. */
+    private suspend fun fingerprint(c: org.imdtv.iptvtv.AppContainer, providerId: Long) =
+        c.db.channelDao().sortedRemoteIds(providerId).hashCode() to c.providerRepository.playlistGuideUrls(providerId)
 
     companion object {
         const val TAG = "IptvSync"

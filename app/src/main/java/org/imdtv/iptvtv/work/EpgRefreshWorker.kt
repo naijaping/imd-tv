@@ -15,6 +15,7 @@ import androidx.work.WorkerParameters
 import org.imdtv.iptvtv.IptvApp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.imdtv.iptvtv.data.epg.EpgImporter
 import org.imdtv.iptvtv.data.epg.epgErrorStatus
 import org.imdtv.iptvtv.data.epg.epgOkStatus
@@ -25,9 +26,36 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 
+/**
+ * Why a guide update runs. [visible]: the user is waiting for it (asked for it, changed a guide setting, added a
+ * playlist, or there's no guide yet), so the TV guide shows "Updating guide…"; the others run quietly.
+ */
+enum class GuideUpdateReason(val visible: Boolean) {
+    /** The "Update the guide every" schedule. */ SCHEDULE(false),
+    /** App start with "Update when the app starts" on. */ APP_START(false),
+    /** A playlist with no guide data at all (its first download; a failed one is tried again at the next start). */ FIRST_GUIDE(true),
+    /** The playlist's channels or guide addresses changed, with "Update when the playlist changes" on. */ PLAYLIST_CHANGED(false),
+    /** A playlist was just added. */ PLAYLIST_ADDED(true),
+    /** Settings › TV guide: Update now. */ USER_REFRESH(true),
+    /** A guide setting changed (source added, a file on or off, the guide order): only that change needs it. */ SETTINGS_CHANGE(true),
+    /** A backup was restored. */ RESTORE(true),
+    /** A sync from the master added playlists. */ SYNC_NEW_PLAYLIST(false),
+}
+
 /** Imports every EPG source of every provider, then rematches channels to guide entries. */
 class EpgRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        val reason = inputData.getString(REASON) ?: GuideUpdateReason.SCHEDULE.name
+        // One update at a time: the schedule and a one-off are separate WorkManager jobs and could overlap.
+        if (!running.compareAndSet(false, true)) { debugLog("skipped ($reason): another update is running"); return Result.success() }
+        val started = System.currentTimeMillis()
+        debugLog("started ($reason)")
+        try {
+            return work().also { debugLog("finished ($reason) in ${System.currentTimeMillis() - started} ms: $it") }
+        } finally { running.set(false) }
+    }
+
+    private suspend fun work(): Result {
         val c = (applicationContext as IptvApp).container
         val settings = c.settings.settings.first()
         val mode = settings.guideOrder
@@ -80,33 +108,53 @@ class EpgRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWo
         fun shouldRetry(attempted: Int, failed: Int) = attempted > 0 && failed == attempted
         private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
+        /** One guide update at a time in this process (the app's only one). */
+        private val running = java.util.concurrent.atomic.AtomicBoolean(false)
+        private const val REASON = "reason"
+        /** Tag of a run the user is waiting for ([GuideUpdateReason.visible]). */
+        private const val VISIBLE = "guide-visible"
+        const val LOG_TAG = "IptvGuideUpdate"
+
+        /** Debug builds only: why each guide update was asked for, ran, or was left out. */
+        fun debugLog(msg: String) { if (org.imdtv.iptvtv.BuildConfig.DEBUG) runCatching { Log.i(LOG_TAG, msg) } }
+
         /** UPDATE keeps the period's timing but applies a changed interval. */
         fun schedule(context: Context, intervalHours: Int) {
+            debugLog("schedule: every $intervalHours h")
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 "epg-refresh", ExistingPeriodicWorkPolicy.UPDATE,
-                PeriodicWorkRequestBuilder<EpgRefreshWorker>(intervalHours.toLong(), TimeUnit.HOURS).setConstraints(network).build(),
+                PeriodicWorkRequestBuilder<EpgRefreshWorker>(intervalHours.toLong(), TimeUnit.HOURS).setConstraints(network)
+                    .setInputData(androidx.work.workDataOf(REASON to GuideUpdateReason.SCHEDULE.name)).build(),
             )
         }
 
-        /** True while a refresh runs (or waits for the network after Update now). */
-        fun updating(context: Context): kotlinx.coroutines.flow.Flow<Boolean> =
+        /**
+         * True while a refresh runs (or waits for the network after Update now). [visibleOnly]: only the ones the user
+         * is waiting for (the TV guide's "Updating guide…"); the Settings page shows every one.
+         */
+        fun updating(context: Context, visibleOnly: Boolean = false): kotlinx.coroutines.flow.Flow<Boolean> =
             WorkManager.getInstance(context).getWorkInfosFlow(androidx.work.WorkQuery.fromUniqueWorkNames(listOf(NOW, "epg-refresh")))
                 // The periodic job is ENQUEUED between runs, so only a one-off counts while it waits.
-                .map { infos -> infos.any { it.state == WorkInfo.State.RUNNING ||
+                .map { infos -> infos.filter { !visibleOnly || VISIBLE in it.tags }.any { it.state == WorkInfo.State.RUNNING ||
                     (it.state == WorkInfo.State.ENQUEUED && it.periodicityInfo == null) } }
+                .distinctUntilChanged()
 
         /**
          * Runs a refresh now. Never cancels one already running: [automatic] triggers (app start, daily playlist sync)
          * leave a running or queued one alone; user changes queue one more run after it, so their change is included.
          * [backlogOnly]: only collapse a backlog (app start with "Update on start" off).
          */
-        fun runNow(context: Context, automatic: Boolean = false, backlogOnly: Boolean = false) {
+        fun runNow(context: Context, reason: GuideUpdateReason, automatic: Boolean = false, backlogOnly: Boolean = false) {
             val wm = WorkManager.getInstance(context)
             val infos = wm.getWorkInfosForUniqueWork(NOW)
             infos.addListener({
                 val states = runCatching { infos.get().map { it.state } }.getOrDefault(emptyList())
-                policy(states, automatic, backlogOnly)?.let {
-                    wm.enqueueUniqueWork(NOW, it, OneTimeWorkRequestBuilder<EpgRefreshWorker>().setConstraints(network).build())
+                val p = policy(states, automatic, backlogOnly)
+                debugLog("asked ($reason): " + (p?.name ?: "ignored, one is already queued or running"))
+                p?.let {
+                    wm.enqueueUniqueWork(NOW, it, OneTimeWorkRequestBuilder<EpgRefreshWorker>().setConstraints(network)
+                        .setInputData(androidx.work.workDataOf(REASON to reason.name))
+                        .apply { if (reason.visible) addTag(VISIBLE) }.build())
                 }
             }, Runnable::run)
         }

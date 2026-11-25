@@ -88,7 +88,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             // Off: still collapse a backlog of queued runs left by 0.5.1 and older.
-            EpgRefreshWorker.runNow(getApplication(), automatic = true, backlogOnly = !c.settings.settings.first().epgUpdateOnStart)
+            EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.APP_START, automatic = true, backlogOnly = !c.settings.settings.first().epgUpdateOnStart)
+            // Besides the schedule, only a playlist with no guide data at all gets one now (its first download).
+            val empty = c.db.providerDao().liveIds().filter { !c.db.epgDao().hasProgrammes(it) }
+            if (empty.isNotEmpty()) EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.FIRST_GUIDE, automatic = true)
         }
         viewModelScope.launch {
             val active = c.providerRepository.activeProviderId.first()
@@ -204,7 +207,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val r = c.providerRepository.syncNow(id) { step -> form.value = form.value.copy(progress = step) }
                 c.providerRepository.setActive(id)
                 hasProvider = true
-                EpgRefreshWorker.runNow(getApplication())
+                EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.PLAYLIST_ADDED)
                 form.value = FormState(result = r.summary() + str(R.string.set_b_guide_loading))
             } catch (e: Exception) {
                 // Don't leave a half-added provider behind; the user will retry with corrected details.
@@ -221,7 +224,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         try {
             val r = c.providerRepository.syncNow(new.id) { step -> form.value = form.value.copy(progress = step) }
             c.epgMatcher.rematch(new.id)
-            if (settings.value.epgUpdateOnPlaylistChange) EpgRefreshWorker.runNow(getApplication())
+            if (settings.value.epgUpdateOnPlaylistChange) EpgRefreshWorker.runNow(getApplication(), org.imdtv.iptvtv.work.GuideUpdateReason.PLAYLIST_CHANGED)
             form.value = FormState(result = r.summary())
         } catch (e: Exception) {
             c.providerRepository.update(old)

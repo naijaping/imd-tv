@@ -42,6 +42,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -196,21 +198,9 @@ fun GuideGrid(
     val marks by vm.marks.collectAsState()
     val recordingOnChannel by vm.recordingOnChannel.collectAsState()
     val gs = vm.settings.collectAsState().value
-    val accent = LocalTheme.current.colors.accent
     Column(modifier) {
-        // Under the times: a faint track across the timeline and, over it, the time gone up to now in the accent colour,
-        // ending on the now line. Redrawn when the minute ticks or the window scrolls: nothing animates.
-        Row(Modifier.height(25.dp).drawBehind {
-            drawRect(Color(0x33FFFFFF), Offset(0f, size.height - 1.dp.toPx()), Size(size.width, 1.dp.toPx()))
-            val x0 = style.channelCol.toPx()
-            val h = 2.dp.toPx()
-            val timeline = size.width - x0
-            if (timeline > 0) {
-                drawRect(Color(0x26FFFFFF), Offset(x0, size.height - h), Size(timeline, h))
-                val gone = (style.dpPerMin * ((now - windowStart) / 60_000).toInt()).toPx().coerceIn(0f, timeline)
-                if (gone > 0) drawRect(accent, Offset(x0, size.height - h), Size(gone, h))
-            }
-        }, verticalAlignment = Alignment.Bottom) {
+        Row(Modifier.height(25.dp).drawBehind { drawRect(Color(0x33FFFFFF), Offset(0f, size.height - 1.dp.toPx()), Size(size.width, 1.dp.toPx())) },
+            verticalAlignment = Alignment.Bottom) {
             val today = stringResource(R.string.live_today).let { t ->
                 // Show date › In the Today cell: "Today · Mon 23/11".
                 if (gs.showDate && gs.datePlace == org.imdtv.iptvtv.data.settings.DatePlace.TODAY_CELL) stringResource(R.string.live_today_date, org.imdtv.iptvtv.ui.dayDate(now)) else t
@@ -247,7 +237,7 @@ fun GuideGrid(
                     val moving = move?.ch?.id == ch.id && !move.dropped || merging?.ch?.id == ch.id
                     GuideRow(
                         ch, (if (moving && merging == null) "↕ " else "") + ch.displayName(strip), programmes[ch.id].orEmpty(), now, at, windowStart, style, isFocused = focused?.id == ch.id && !state.railOpen && state.heldFocus == null, moving = moving, logos = logos, display = display,
-                        cellProgress = gs.cellProgress, progressColor = accent,
+                        cellProgress = gs.cellProgress,
                         marked = { p -> (ch.id to p.start) in marks || ch.id in recordingOnChannel && p.start <= now && now < p.stop },
                         modifier = (if (i == state.focusIndex) Modifier.focusRequester(state.rowFocus) else Modifier)
                             .onPreviewKeyEvent { e ->
@@ -367,8 +357,8 @@ private fun GuideRow(
     /** Non-null: the channel's logo replaces its name (Settings › Channels › Logos instead of names, issue #13). */
     logos: List<org.imdtv.iptvtv.data.settings.LogoKind>? = null,
     display: org.imdtv.iptvtv.data.settings.GuideChannelDisplay = org.imdtv.iptvtv.data.settings.GuideChannelDisplay.NAME,
-    /** Appearance › Live TV › Progress in the highlighted programme: a thin bar along its cell's bottom. */
-    cellProgress: Boolean = false, progressColor: Color = Color.White,
+    /** Appearance › Live TV › Progress bars on programmes airing now: a thin bar along each one's bottom. */
+    cellProgress: Boolean = false,
 ) {
     val colors = LocalTheme.current.colors
     Row(Modifier.height(style.rowHeight).then(if (style.rowDividers) Modifier.drawBehind {
@@ -459,6 +449,7 @@ private fun GuideRow(
                     else -> Modifier.width(style.dpPerMin * span.lengthMin)
                         .background(colors.cellDim.copy(alpha = if (past) .19f else .35f), RectangleShape)
                 }
+                val cellShape = when { style.boxed -> BOX; style.roundedCells -> CELL; else -> RectangleShape }
                 val runsBefore = style.overflowArrows && p.start < windowStart
                 val runsAfter = style.overflowArrows && p.stop > end
                 val rec = marked(p)
@@ -473,13 +464,10 @@ private fun GuideRow(
                             if (runsAfter) drawPath(Path().apply { val x = size.width - 1f; moveTo(x, mid); lineTo(x - a, mid - a); lineTo(x - a, mid + a); close() }, mark)
                             // Scheduled or recording: a small red dot top-right.
                             if (rec) drawCircle(REC_DOT, 3.dp.toPx(), Offset(size.width - 7.dp.toPx(), 7.dp.toPx()))
-                            // The highlighted programme on now: how far it has got, along its bottom (the part in the window).
-                            if (cellProgress && focusedNow && isNow) {
-                                val f = ((now - maxOf(p.start, windowStart)).toFloat() / (minOf(p.stop, end) - maxOf(p.start, windowStart)).coerceAtLeast(1)).coerceIn(0f, 1f)
-                                val h = 2.dp.toPx()
-                                drawRect(Color(0x33FFFFFF), Offset(0f, size.height - h), Size(size.width, h))
-                                drawRect(progressColor, Offset(0f, size.height - h), Size(size.width * f, h))
-                            }
+                            // A programme airing now: how far it has got (in the part the window shows, so it ends on the
+                            // now line), along its bottom. Clipped to the cell's own shape and kept inside its border.
+                            if (cellProgress && isNow) drawCellProgress(cellShape, ((now - maxOf(p.start, windowStart)).toFloat() /
+                                (minOf(p.stop, end) - maxOf(p.start, windowStart)).coerceAtLeast(1)).coerceIn(0f, 1f))
                         },
                     contentAlignment = Alignment.CenterStart,
                 ) {
@@ -492,6 +480,30 @@ private fun GuideRow(
 }
 
 private val REC_DOT = Color(0xFFE53935)
+
+/** The programme progress bar's colour (Appearance › Live TV › Progress bars on programmes airing now): sky blue. */
+val guideProgressBlue = Color(0xFF1EA7E8)
+/** The bar's height, and how far it stays inside the cell's edge (clear of its 1 dp border and focus outline). */
+private val PROGRESS_BAR = 3.5.dp
+private val PROGRESS_INSET = 1.5.dp
+
+/**
+ * A rounded bar along the cell's bottom: a faint blue track, the elapsed [fraction] solid. Clipped to [shape] (the cell's
+ * rounded corners), so it never shows past them; drawn under the cell's border, which is painted after it.
+ */
+internal fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCellProgress(shape: androidx.compose.ui.graphics.Shape, fraction: Float) {
+    val inset = PROGRESS_INSET.toPx()
+    val h = PROGRESS_BAR.toPx()
+    val w = size.width - 2 * inset
+    if (w < h || size.height < h + 2 * inset) return // too narrow a cell for a bar
+    val clip = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawCellProgress)) }
+    clipPath(clip) {
+        val top = Offset(inset, size.height - inset - h)
+        val r = androidx.compose.ui.geometry.CornerRadius(h / 2)
+        drawRoundRect(guideProgressBlue.copy(alpha = .28f), top, Size(w, h), r)
+        if (fraction > 0f) drawRoundRect(guideProgressBlue, top, Size(maxOf(w * fraction, h), h), r)
+    }
+}
 
 /** Marks a channel with catch-up (guide channel column, full-screen overlay). */
 @Composable

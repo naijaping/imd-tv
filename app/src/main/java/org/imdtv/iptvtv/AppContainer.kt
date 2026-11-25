@@ -126,7 +126,7 @@ class AppContainer(context: Context) {
     val sync: org.imdtv.iptvtv.data.sync.SyncManager by lazy {
         org.imdtv.iptvtv.data.sync.SyncManager(appContext, prefs, backup, afterMirror = { r ->
             // New playlists get matched by the guide import; the rest only when the matcher's inputs changed.
-            if (r.added.isNotEmpty()) org.imdtv.iptvtv.work.EpgRefreshWorker.runNow(appContext)
+            if (r.added.isNotEmpty()) org.imdtv.iptvtv.work.EpgRefreshWorker.runNow(appContext, org.imdtv.iptvtv.work.GuideUpdateReason.SYNC_NEW_PLAYLIST, automatic = true)
             else if (r.guideChanged) db.providerDao().ids().forEach { epgMatcher.rematch(it) }
         }, background)
     }
