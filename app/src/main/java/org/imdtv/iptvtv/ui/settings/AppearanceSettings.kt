@@ -101,7 +101,7 @@ fun AppearanceLiveRows(vm: SettingsViewModel, first: FocusRequester) {
         BrandLogoRow(vm, s)
     }
     SwitchRow(stringResource(R.string.set_a_live_indicator), stringResource(R.string.set_a_live_indicator_expl), s.showLiveIndicator, if (s.glass()) Modifier else f) { on -> vm.update { it.copy(showLiveIndicator = on) } }
-    SwitchRow(stringResource(R.string.set_d_cell_progress), stringResource(R.string.set_d_cell_progress_expl), s.cellProgress) { on -> vm.update { it.copy(cellProgress = on) } }
+    SwitchRow(stringResource(R.string.set_d_hero_progress), stringResource(R.string.set_d_hero_progress_expl), s.heroProgress) { on -> vm.update { it.copy(heroProgress = on) } }
     SwitchRow(stringResource(R.string.set_a_multi_line), stringResource(R.string.set_a_multi_line_expl), s.multiLineGuide) { on -> vm.update { it.copy(multiLineGuide = on) } }
     ChoiceRow(stringResource(R.string.set_a_title_size), stringResource(R.string.set_a_title_size_live_expl), TitleSize.entries, s.titleSize, { stringResource(it.labelRes) }, default = AppSettings().titleSize, onPick = { v -> vm.update { it.copy(titleSize = v) } })
     ChoiceRow(stringResource(R.string.set_a_epg_text_size), stringResource(R.string.set_a_epg_text_size_expl), org.imdtv.iptvtv.data.settings.EpgTextSize.entries, s.epgTextSize, { stringResource(it.labelRes) }, default = AppSettings().epgTextSize, onPick = { v -> vm.update { it.copy(epgTextSize = v) } })

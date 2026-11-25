@@ -134,8 +134,8 @@ data class AppSettings(
     /** The top menu's unselected items fade to [menuDim] while focus is elsewhere; full brightness when it has focus. */
     val dimTopMenu: Boolean = true,
     val menuDim: MenuDim = MenuDim.MEDIUM,
-    /** TV guide: a thin progress bar along the bottom of the highlighted programme's cell. */
-    val cellProgress: Boolean = false,
+    /** TV guide header: the programme's progress bar under its details. */
+    val heroProgress: Boolean = true,
     val showPing: Boolean = false,
     /** The "Recently watched" category in the TV guide. */
     val showRecent: Boolean = true,
@@ -249,7 +249,7 @@ data class AppSettings(
         copy(theme = d.theme, themeColour = d.themeColour, themeDark = d.themeDark, guideRows = d.guideRows, headerSize = d.headerSize,
             previewFade = d.previewFade, themeLooks = emptyMap(), multiLineGuide = d.multiLineGuide, showDateTime = d.showDateTime,
             showDate = d.showDate, datePlace = d.datePlace, clockFollowsDevice = d.clockFollowsDevice, dimTopMenu = d.dimTopMenu, menuDim = d.menuDim,
-            cellProgress = d.cellProgress, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
+            heroProgress = d.heroProgress, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
             showLiveIndicator = d.showLiveIndicator, heroLogoScale = d.heroLogoScale, heroTitleScale = d.heroTitleScale, brandLogoScale = d.brandLogoScale)
     }
 

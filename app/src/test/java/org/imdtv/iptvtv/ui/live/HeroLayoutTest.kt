@@ -40,7 +40,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * The guide header rendered for real (Inter, the app's 960×540dp canvas) at every Header size × Header channel logo
  * × Header title size, Glass and Liquid heights, short and long titles, at 1080p and 720p densities:
- * always logo → title → description → meta line, stacked on one left edge, inside the header's height.
+ * always logo → title → description → meta line → progress bar, stacked on one left edge, inside the header's height.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -93,9 +93,9 @@ class HeroLayoutTest {
             val titleB = bounds("heroTitle")!!
             val metaB = bounds("heroMeta")!!
             val descB = bounds("heroDesc")
-            assertTrue("$where: no progress bar in the header", bounds("heroProgress") == null)
-            // Logo, title, description, meta line (the reference order).
-            val parts = listOfNotNull(logoB, titleB, descB, metaB)
+            val progB = bounds("heroProgress")
+            // Logo, title, description, meta line, then the progress bar.
+            val parts = listOfNotNull(logoB, titleB, descB, metaB, progB)
             // Stacked in order, never side by side.
             for ((a, b) in parts.zipWithNext()) assertTrue("$where: overlap/order ${a.bottom} > ${b.top}", b.top >= a.bottom - .5.dp)
             // One left edge for logo, title and meta line.
@@ -106,7 +106,7 @@ class HeroLayoutTest {
                 assertTrue("$where: right ${p.right}", p.right.value <= 24f + 575f + .6f)
             }
             // Large and Medium keep a description at the default sizes; it's never more than 2 lines.
-            if (logo == 1f && title == 1f && size != HeaderSize.SMALL) assertTrue("$where: desc", descB != null)
+            if (logo == 1f && title == 1f && size != HeaderSize.SMALL) assertTrue("$where: desc and progress", descB != null && progB != null)
             descB?.let { assertTrue("$where: desc ${it.bottom - it.top} tall", (it.bottom - it.top).value <= 2 * 19f + 7f + .6f) }
             checked++
         }

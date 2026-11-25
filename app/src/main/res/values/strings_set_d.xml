@@ -18,7 +18,7 @@
     <string name="set_d_dim_menu_expl">The menu\'s items fade while you\'re in the guide or a list, and light up when you move up to them. The selected tab, logo and time stay clear</string>
     <string name="set_d_dim_level">Dim level</string>
     <string name="set_d_dim_level_expl">How faint the menu gets while not in use</string>
-    <string name="set_d_cell_progress">Progress bars on programmes airing now</string>
-    <string name="set_d_cell_progress_expl">A thin blue bar along the bottom of each programme on now shows how far it has got</string>
+    <string name="set_d_hero_progress">Programme progress bar</string>
+    <string name="set_d_hero_progress_expl">The bar under the programme\'s details at the top of the TV guide, showing how far it has got</string>
     <string name="live_today_date">Today · %1$s</string>
 </resources>

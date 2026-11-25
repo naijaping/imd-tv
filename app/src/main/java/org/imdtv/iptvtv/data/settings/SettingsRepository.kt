@@ -33,7 +33,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val clockFollowsDevice = booleanPreferencesKey("clock_follows_device")
     private val dimTopMenu = booleanPreferencesKey("dim_top_menu")
     private val menuDim = stringPreferencesKey("menu_dim")
-    private val cellProgress = booleanPreferencesKey("cell_progress")
+    private val heroProgress = booleanPreferencesKey("hero_progress")
     private val themeLooks = stringPreferencesKey("theme_looks")
     private val guidesOff = androidx.datastore.preferences.core.stringSetPreferencesKey("guides_off")
     private val liveSubtitlesOn = booleanPreferencesKey("live_subtitles_on")
@@ -133,7 +133,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             clockFollowsDevice = this[clockFollowsDevice] ?: (this[clock24h] != false),
             dimTopMenu = this[dimTopMenu] ?: d.dimTopMenu,
             menuDim = MenuDim.entries.find { it.name == this[menuDim] } ?: d.menuDim,
-            cellProgress = this[cellProgress] ?: d.cellProgress,
+            heroProgress = this[heroProgress] ?: d.heroProgress,
             guidesOff = this[guidesOff].orEmpty(),
             themeLooks = this[themeLooks]?.split('|')?.mapNotNull { e -> e.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap().orEmpty(),
             liveSubtitlesOn = this[liveSubtitlesOn] ?: d.liveSubtitlesOn,
@@ -220,7 +220,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         this[clockFollowsDevice] = s.clockFollowsDevice
         this[dimTopMenu] = s.dimTopMenu
         this[menuDim] = s.menuDim.name
-        this[cellProgress] = s.cellProgress
+        this[heroProgress] = s.heroProgress
         this[guidesOff] = s.guidesOff
         this[themeLooks] = s.themeLooks.entries.joinToString("|") { "${it.key}=${it.value}" }
         this[liveSubtitlesOn] = s.liveSubtitlesOn

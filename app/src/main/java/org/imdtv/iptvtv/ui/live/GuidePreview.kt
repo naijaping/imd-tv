@@ -151,16 +151,16 @@ fun Hero(ch: ChannelEntity?, name: String, progs: List<GuideProgramme>, now: Lon
          size: HeaderSize = HeaderSize.LARGE, /** The highlighted programme's time (a later one after Right). */ at: Long = now,
          /** Header channel logo / Header title size (Appearance › Live TV): scale those two only. */ logoScale: Float = 1f, titleScale: Float = 1f,
          /** The height the header has above the "◀ category" line: big sizes shrink to fit it, the description loses lines. */
-         maxHeight: Dp = Dp.Infinity) {
+         maxHeight: Dp = Dp.Infinity,
+         /** Appearance › Live TV › Programme progress bar. */ showProgress: Boolean = true) {
     if (ch == null) return
     val cur = progs.firstOrNull { it.start <= at && at < it.stop }
     val later = cur != null && cur.start > now
     val aired = cur != null && cur.stop <= now // catch-up: a past programme highlighted
-    // One stacked layout at every Header size: logo, title, description (2 lines at most), meta line with badges. Medium
-    // and Small scale the block down (HeroBlock.of) to fit their height. The programme's progress is the line under the
-    // guide's times now, not a bar here.
+    // One stacked layout at every Header size: logo, title, description (2 lines at most), meta line with badges, then
+    // the progress bar (when on). Medium and Small scale the block down (HeroBlock.of) to fit their height.
     val b = HeroBlock.of(size)
-    val plan = planHero(b, logoScale, titleScale, hasProgress = false, hasDesc = cur?.desc != null, maxHeight.value)
+    val plan = planHero(b, logoScale, titleScale, hasProgress = showProgress && cur != null && !later && !aired, hasDesc = cur?.desc != null, maxHeight.value)
     Column(modifier.heightIn(max = maxHeight)) {
         Box(Modifier.size((b.logoH * 60 / 43 * plan.logo).dp, (b.logoH * plan.logo).dp).clip(RoundedCornerShape(3.dp)).background(Color(0x33FFFFFF)).testTag("heroLogo"),
             contentAlignment = Alignment.Center) {
@@ -192,6 +192,13 @@ fun Hero(ch: ChannelEntity?, name: String, progs: List<GuideProgramme>, now: Lon
             badges.forEach { badge ->
                 Text(badge, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1,
                     modifier = Modifier.border(1.dp, Color(0xCCFFFFFF), RoundedCornerShape(2.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
+            }
+        }
+        // The programme's progress, as before: white over a faint track, 210 × 2.5 dp.
+        if (plan.progress) {
+            val f = ((now - cur!!.start).toFloat() / (cur.stop - cur.start)).coerceIn(0f, 1f)
+            Box(Modifier.padding(top = 9.dp).size(210.dp, 2.5.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x24FFFFFF)).testTag("heroProgress")) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(f).background(Color.White))
             }
         }
     }
