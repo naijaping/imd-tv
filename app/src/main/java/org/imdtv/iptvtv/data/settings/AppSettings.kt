@@ -72,6 +72,14 @@ enum class VideoAspect(val label: String, @StringRes val labelRes: Int) {
 /** How a merged channel picks which of its sources to play. */
 enum class MergeBy(@StringRes val labelRes: Int) { RESOLUTION(R.string.set_a_merge_by_resolution), LATENCY(R.string.set_a_merge_by_latency) }
 
+/** Where the date shows with Show date on: under the time (Live TV guide, top right) or in the guide's "Today" cell. */
+enum class DatePlace { UNDER_TIME, TODAY_CELL }
+
+/** Dim top menu's strength: the unselected menu items' opacity while focus is elsewhere. */
+enum class MenuDim(@StringRes val labelRes: Int, val alpha: Float) {
+    LIGHT(R.string.set_d_dim_light, .65f), MEDIUM(R.string.set_d_dim_medium, .45f), STRONG(R.string.set_d_dim_strong, .3f)
+}
+
 enum class HeaderSize(val label: String, @StringRes val labelRes: Int) {
     LARGE("Large", R.string.set_a_size_large), MEDIUM("Medium", R.string.set_a_size_medium), SMALL("Small", R.string.set_a_size_small)
 }
@@ -119,6 +127,15 @@ data class AppSettings(
     val showDateTime: Boolean = true,
     /** The date beside that clock. */
     val showDate: Boolean = true,
+    /** With [showDate]: where the Live TV guide shows it (other screens keep it beside the time). */
+    val datePlace: DatePlace = DatePlace.UNDER_TIME,
+    /** Follow the TV's 12/24-hour setting; off: [clock24h] decides. */
+    val clockFollowsDevice: Boolean = true,
+    /** The top menu's unselected items fade to [menuDim] while focus is elsewhere; full brightness when it has focus. */
+    val dimTopMenu: Boolean = true,
+    val menuDim: MenuDim = MenuDim.MEDIUM,
+    /** TV guide: a thin progress bar along the bottom of the highlighted programme's cell. */
+    val cellProgress: Boolean = false,
     val showPing: Boolean = false,
     /** The "Recently watched" category in the TV guide. */
     val showRecent: Boolean = true,
@@ -231,7 +248,8 @@ data class AppSettings(
     fun resetAppearance() = AppSettings().let { d ->
         copy(theme = d.theme, themeColour = d.themeColour, themeDark = d.themeDark, guideRows = d.guideRows, headerSize = d.headerSize,
             previewFade = d.previewFade, themeLooks = emptyMap(), multiLineGuide = d.multiLineGuide, showDateTime = d.showDateTime,
-            showDate = d.showDate, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
+            showDate = d.showDate, datePlace = d.datePlace, clockFollowsDevice = d.clockFollowsDevice, dimTopMenu = d.dimTopMenu, menuDim = d.menuDim,
+            cellProgress = d.cellProgress, clock24h = d.clock24h, playerClock = d.playerClock, epgTextSize = d.epgTextSize,
             showLiveIndicator = d.showLiveIndicator, heroLogoScale = d.heroLogoScale, heroTitleScale = d.heroTitleScale, brandLogoScale = d.brandLogoScale)
     }
 

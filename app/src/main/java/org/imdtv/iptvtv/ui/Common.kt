@@ -34,6 +34,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.composed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -76,12 +77,19 @@ fun FocusBox(
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun TopNav(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier, selectedFocus: FocusRequester? = null, showClock: Boolean = true,
-           showDate: Boolean = false, pingMs: Int? = null, tabs: List<Tab> = visibleTabs(false)) {
+           showDate: Boolean = false, pingMs: Int? = null, tabs: List<Tab> = visibleTabs(false),
+           /** Unselected items' opacity while focus is elsewhere (Dim top menu); 1 = never dimmed. */ idleAlpha: Float = 1f,
+           /** False: the clock and ping aren't in the row (the Live TV guide shows them at the top right itself). */ trailing: Boolean = true) {
+    // Dim top menu: fades in when focus comes up into the menu (~180 ms) and out when it leaves; nothing runs in between.
+    var hasFocus by remember { mutableStateOf(false) }
+    val dim by androidx.compose.animation.core.animateFloatAsState(if (hasFocus) 1f else idleAlpha, androidx.compose.animation.core.tween(180), label = "menuDim")
+    val liquid = LocalGlassBackdrop.current != null
     // Entering the menu from below lands on the current tab, not the nearest one.
     Row(
-        modifier.focusProperties { enter = { selectedFocus ?: FocusRequester.Default } }.focusGroup()
-            // Liquid Glass: the nav sits in a glass pill (no-op in other themes).
-            .glass(RoundedCornerShape(22.dp)).padding(if (LocalGlassBackdrop.current != null) 5.dp else 0.dp),
+        modifier.onFocusChanged { hasFocus = it.hasFocus }.focusProperties { enter = { selectedFocus ?: FocusRequester.Default } }.focusGroup()
+            // A rounded see-through pill (Liquid Glass: its glass pill instead).
+            .then(if (liquid) Modifier.glass(RoundedCornerShape(22.dp)).padding(5.dp)
+                else Modifier.clip(RoundedCornerShape(22.dp)).background(Color(0x1AFFFFFF)).padding(horizontal = 5.dp, vertical = 4.dp)),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -89,7 +97,8 @@ fun TopNav(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier
             FocusBox(onClick = { onSelect(t) }, modifier = if (t == selected && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier) { f ->
                 val fg = when { f -> Color.Black; t == selected -> Color.White; else -> LocalTheme.current.colors.muted }
                 Row(
-                    Modifier.clip(RoundedCornerShape(15.dp))
+                    // The selected tab stays clear when the rest dims.
+                    Modifier.graphicsLayer { alpha = if (t == selected || f) 1f else dim }.clip(RoundedCornerShape(15.dp))
                         .background(when { f -> Color.White; t == selected -> Color(0x1FFFFFFF); else -> Color.Transparent })
                         .padding(horizontal = 13.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -99,19 +108,41 @@ fun TopNav(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier
                 }
             }
         }
-        if (showClock || showDate) NavClock(showClock, showDate)
-        pingMs?.let { Text(pingLabel(it), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = LocalTheme.current.colors.muted, modifier = Modifier.padding(start = 14.dp)) }
+        if (trailing) {
+            // The time stays readable when the menu dims: never below 85%.
+            Box(Modifier.graphicsLayer { alpha = maxOf(dim, .85f) }) { if (showClock || showDate) NavClock(showClock, showDate) }
+            pingMs?.let { Text(pingLabel(it), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = LocalTheme.current.colors.muted, modifier = Modifier.padding(start = 14.dp, end = 8.dp)) }
+        }
     }
 }
 
 /** Its own composable, so the minute tick recomposes only this Text, not the nav. */
 @Composable
 private fun NavClock(showClock: Boolean, showDate: Boolean) {
-    val now by produceState(System.currentTimeMillis()) {
-        while (true) { delay(60_000 - System.currentTimeMillis() % 60_000); value = System.currentTimeMillis() }
-    }
+    val now = minuteClock()
     Text(listOfNotNull(clockTime(now).takeIf { showClock }, dayDate(now).takeIf { showDate }).joinToString(" "), fontSize = 12.sp, fontWeight = FontWeight.Medium,
-        color = Color.White, modifier = Modifier.padding(start = 14.dp))
+        color = Color.White, modifier = Modifier.padding(start = 14.dp, end = 8.dp))
+}
+
+/** The time now, changing on each new minute (one wake-up a minute, not a timer per frame). */
+@Composable
+fun minuteClock(): Long = produceState(System.currentTimeMillis()) {
+    while (true) { delay(60_000 - System.currentTimeMillis() % 60_000); value = System.currentTimeMillis() }
+}.value
+
+/**
+ * The Live TV guide's top right: the time, right-aligned; under it the date (smaller, dimmer) with Show date › Under the
+ * time, then the connection ping with Show ping. Never dimmed with the menu.
+ */
+@Composable
+fun TopClock(showClock: Boolean, dateUnder: Boolean, pingMs: Int?, modifier: Modifier = Modifier) {
+    val now = minuteClock()
+    val shadow = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 1f), 4f))
+    androidx.compose.foundation.layout.Column(modifier, horizontalAlignment = Alignment.End) {
+        if (showClock) Text(clockTime(now), fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = Color.White, style = shadow)
+        if (dateUnder) Text(dayDate(now), fontSize = 11.sp, lineHeight = 14.sp, color = Color(0xCCFFFFFF), style = shadow)
+        pingMs?.let { Text(pingLabel(it), fontSize = 10.sp, lineHeight = 13.sp, color = LocalTheme.current.colors.muted, style = shadow) }
+    }
 }
 
 // shortcut: global, not state; screens pick it up on their next recomposition (clock ticks each minute)

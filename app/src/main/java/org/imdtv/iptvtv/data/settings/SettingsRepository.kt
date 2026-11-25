@@ -29,6 +29,11 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val oldPlayerClock = booleanPreferencesKey("player_clock") // before Live TV only / Universal: true = Universal
     private val playerClock = stringPreferencesKey("player_clock_mode")
     private val showDate = booleanPreferencesKey("show_date")
+    private val datePlace = stringPreferencesKey("date_place")
+    private val clockFollowsDevice = booleanPreferencesKey("clock_follows_device")
+    private val dimTopMenu = booleanPreferencesKey("dim_top_menu")
+    private val menuDim = stringPreferencesKey("menu_dim")
+    private val cellProgress = booleanPreferencesKey("cell_progress")
     private val themeLooks = stringPreferencesKey("theme_looks")
     private val guidesOff = androidx.datastore.preferences.core.stringSetPreferencesKey("guides_off")
     private val liveSubtitlesOn = booleanPreferencesKey("live_subtitles_on")
@@ -123,6 +128,12 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             playerClock = PlayerClock.entries.find { it.name == this[playerClock] }
                 ?: this[oldPlayerClock]?.let { if (it) PlayerClock.ALL else PlayerClock.OFF } ?: d.playerClock,
             showDate = this[showDate] ?: d.showDate,
+            datePlace = DatePlace.entries.find { it.name == this[datePlace] } ?: d.datePlace,
+            // Before this setting: a 12-hour clock picked by hand stays; the 24-hour default now follows the TV.
+            clockFollowsDevice = this[clockFollowsDevice] ?: (this[clock24h] != false),
+            dimTopMenu = this[dimTopMenu] ?: d.dimTopMenu,
+            menuDim = MenuDim.entries.find { it.name == this[menuDim] } ?: d.menuDim,
+            cellProgress = this[cellProgress] ?: d.cellProgress,
             guidesOff = this[guidesOff].orEmpty(),
             themeLooks = this[themeLooks]?.split('|')?.mapNotNull { e -> e.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap().orEmpty(),
             liveSubtitlesOn = this[liveSubtitlesOn] ?: d.liveSubtitlesOn,
@@ -205,6 +216,11 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         this[clock24h] = s.clock24h
         this[playerClock] = s.playerClock.name
         this[showDate] = s.showDate
+        this[datePlace] = s.datePlace.name
+        this[clockFollowsDevice] = s.clockFollowsDevice
+        this[dimTopMenu] = s.dimTopMenu
+        this[menuDim] = s.menuDim.name
+        this[cellProgress] = s.cellProgress
         this[guidesOff] = s.guidesOff
         this[themeLooks] = s.themeLooks.entries.joinToString("|") { "${it.key}=${it.value}" }
         this[liveSubtitlesOn] = s.liveSubtitlesOn

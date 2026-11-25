@@ -126,9 +126,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
      * The last list each recent category showed (by playlist, key and sort), so going back to one while browsing the
      * category panel shows it at once; the live query replaces it a moment later.
      */
-    private val listingCache = object : LinkedHashMap<String, List<ChannelEntity>>(32, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<ChannelEntity>>?) = size > 40
-    }
+    // Bounded by rows, not lists (a row is ~0.5 KB): 40 lists of a few thousand channels held ~100 MB and made the box
+    // lag. Lists over 3,000 channels aren't kept; they load from the database as before.
+    private val listingCache = org.imdtv.iptvtv.data.SizedLru<String, List<ChannelEntity>>(LISTING_CACHE_ROWS, maxItem = 3_000) { it.size }
 
     val listing: StateFlow<Pair<String?, List<ChannelEntity>>> = combine(providerId, entry, selectedSort) { p, e, by -> Triple(p, e, by) }
         .distinctUntilChangedBy { (p, e, by) -> Triple(p, e?.key, by) }
@@ -139,8 +139,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
                 val k = "$p|${e.key}|$by"
                 combine(railRepo.channels(p, e), hideHeaders, strip) { list, hide, s ->
                     e.key to ChannelSort.sorted(if (hide) list.filterNot { isHeaderChannel(it.name) } else list, by, s)
-                }.onEach { synchronized(listingCache) { listingCache[k] = it.second } }
-                    .onStart { synchronized(listingCache) { listingCache[k] }?.let { emit(e.key to it) } }
+                }.onEach { listingCache[k] = it.second }
+                    .onStart { listingCache[k]?.let { emit(e.key to it) } }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null to emptyList())
@@ -438,7 +438,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     val recentProgrammes: StateFlow<Map<Long, List<GuideProgramme>>> =
         combine(recents, now, c.db.epgDao().observeGuideVersion()) { r, n, _ -> r to n }
             .mapLatest { (r, n) -> provider.value?.let { guide.programmes(it.id, r, n, n + 12 * 3_600_000L) }.orEmpty() } // now and next
-            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+            // Only while the full-screen overlay shows it: Eagerly, it queried the database every 30 s all day, in the background too.
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /** Full screen Up/Down (spec §4.2): the next/previous channel of the selected category, wrapping. */
     fun zapBy(delta: Int) {
@@ -765,6 +766,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
+        /** Category lists kept for the panel's instant preview: about 3 MB of channel rows at most. */
+        const val LISTING_CACHE_ROWS = 6_000
         const val HALF_HOUR = 30 * 60_000L
         const val WINDOW = 5 * HALF_HOUR // the widest guide (Glass, Liquid: 2½ hours)
         const val MAX_SHIFT = 7 * 48 // 7 days of half-hours

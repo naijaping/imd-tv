@@ -195,10 +195,27 @@ fun GuideGrid(
     val strip by vm.strip.collectAsState()
     val marks by vm.marks.collectAsState()
     val recordingOnChannel by vm.recordingOnChannel.collectAsState()
+    val gs = vm.settings.collectAsState().value
+    val accent = LocalTheme.current.colors.accent
     Column(modifier) {
-        Row(Modifier.height(25.dp).drawBehind { drawRect(Color(0x33FFFFFF), Offset(0f, size.height - 1.dp.toPx()), Size(size.width, 1.dp.toPx())) },
-            verticalAlignment = Alignment.Bottom) {
-            Text(if (windowStart - now > 12 * 3600_000) stringResource(R.string.live_later) else if (past && org.imdtv.iptvtv.ui.dayDate(windowStart) != org.imdtv.iptvtv.ui.dayDate(now)) org.imdtv.iptvtv.ui.dayDate(windowStart) else stringResource(R.string.live_today), fontSize = 13.sp * epg, fontWeight = FontWeight.SemiBold,
+        // Under the times: a faint track across the timeline and, over it, the time gone up to now in the accent colour,
+        // ending on the now line. Redrawn when the minute ticks or the window scrolls: nothing animates.
+        Row(Modifier.height(25.dp).drawBehind {
+            drawRect(Color(0x33FFFFFF), Offset(0f, size.height - 1.dp.toPx()), Size(size.width, 1.dp.toPx()))
+            val x0 = style.channelCol.toPx()
+            val h = 2.dp.toPx()
+            val timeline = size.width - x0
+            if (timeline > 0) {
+                drawRect(Color(0x26FFFFFF), Offset(x0, size.height - h), Size(timeline, h))
+                val gone = (style.dpPerMin * ((now - windowStart) / 60_000).toInt()).toPx().coerceIn(0f, timeline)
+                if (gone > 0) drawRect(accent, Offset(x0, size.height - h), Size(gone, h))
+            }
+        }, verticalAlignment = Alignment.Bottom) {
+            val today = stringResource(R.string.live_today).let { t ->
+                // Show date › In the Today cell: "Today · Mon 23/11".
+                if (gs.showDate && gs.datePlace == org.imdtv.iptvtv.data.settings.DatePlace.TODAY_CELL) stringResource(R.string.live_today_date, org.imdtv.iptvtv.ui.dayDate(now)) else t
+            }
+            Text(if (windowStart - now > 12 * 3600_000) stringResource(R.string.live_later) else if (past && org.imdtv.iptvtv.ui.dayDate(windowStart) != org.imdtv.iptvtv.ui.dayDate(now)) org.imdtv.iptvtv.ui.dayDate(windowStart) else today, fontSize = 13.sp * epg, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = style.headerColor ?: Color.White, modifier = Modifier.width(style.channelCol).padding(bottom = 5.dp))
             for (i in 0 until style.windowMin / 30) {
                 Text(clockTime(windowStart + i * LiveViewModel.HALF_HOUR), fontSize = 11.sp * epg, color = style.headerColor ?: LocalTheme.current.colors.muted,
@@ -230,6 +247,7 @@ fun GuideGrid(
                     val moving = move?.ch?.id == ch.id && !move.dropped || merging?.ch?.id == ch.id
                     GuideRow(
                         ch, (if (moving && merging == null) "↕ " else "") + ch.displayName(strip), programmes[ch.id].orEmpty(), now, at, windowStart, style, isFocused = focused?.id == ch.id && !state.railOpen && state.heldFocus == null, moving = moving, logos = logos, display = display,
+                        cellProgress = gs.cellProgress, progressColor = accent,
                         marked = { p -> (ch.id to p.start) in marks || ch.id in recordingOnChannel && p.start <= now && now < p.stop },
                         modifier = (if (i == state.focusIndex) Modifier.focusRequester(state.rowFocus) else Modifier)
                             .onPreviewKeyEvent { e ->
@@ -349,6 +367,8 @@ private fun GuideRow(
     /** Non-null: the channel's logo replaces its name (Settings › Channels › Logos instead of names, issue #13). */
     logos: List<org.imdtv.iptvtv.data.settings.LogoKind>? = null,
     display: org.imdtv.iptvtv.data.settings.GuideChannelDisplay = org.imdtv.iptvtv.data.settings.GuideChannelDisplay.NAME,
+    /** Appearance › Live TV › Progress in the highlighted programme: a thin bar along its cell's bottom. */
+    cellProgress: Boolean = false, progressColor: Color = Color.White,
 ) {
     val colors = LocalTheme.current.colors
     Row(Modifier.height(style.rowHeight).then(if (style.rowDividers) Modifier.drawBehind {
@@ -453,6 +473,13 @@ private fun GuideRow(
                             if (runsAfter) drawPath(Path().apply { val x = size.width - 1f; moveTo(x, mid); lineTo(x - a, mid - a); lineTo(x - a, mid + a); close() }, mark)
                             // Scheduled or recording: a small red dot top-right.
                             if (rec) drawCircle(REC_DOT, 3.dp.toPx(), Offset(size.width - 7.dp.toPx(), 7.dp.toPx()))
+                            // The highlighted programme on now: how far it has got, along its bottom (the part in the window).
+                            if (cellProgress && focusedNow && isNow) {
+                                val f = ((now - maxOf(p.start, windowStart)).toFloat() / (minOf(p.stop, end) - maxOf(p.start, windowStart)).coerceAtLeast(1)).coerceIn(0f, 1f)
+                                val h = 2.dp.toPx()
+                                drawRect(Color(0x33FFFFFF), Offset(0f, size.height - h), Size(size.width, h))
+                                drawRect(progressColor, Offset(0f, size.height - h), Size(size.width * f, h))
+                            }
                         },
                     contentAlignment = Alignment.CenterStart,
                 ) {

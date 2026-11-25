@@ -156,10 +156,11 @@ fun Hero(ch: ChannelEntity?, name: String, progs: List<GuideProgramme>, now: Lon
     val cur = progs.firstOrNull { it.start <= at && at < it.stop }
     val later = cur != null && cur.start > now
     val aired = cur != null && cur.stop <= now // catch-up: a past programme highlighted
-    // One stacked layout at every Header size (logo, title, meta line, description, progress bar), as Large;
-    // Medium and Small scale the block down (HeroBlock.of) to fit their height.
+    // One stacked layout at every Header size: logo, title, description (2 lines at most), meta line with badges. Medium
+    // and Small scale the block down (HeroBlock.of) to fit their height. The programme's progress is the line under the
+    // guide's times now, not a bar here.
     val b = HeroBlock.of(size)
-    val plan = planHero(b, logoScale, titleScale, hasProgress = cur != null && !later && !aired, hasDesc = cur?.desc != null, maxHeight.value)
+    val plan = planHero(b, logoScale, titleScale, hasProgress = false, hasDesc = cur?.desc != null, maxHeight.value)
     Column(modifier.heightIn(max = maxHeight)) {
         Box(Modifier.size((b.logoH * 60 / 43 * plan.logo).dp, (b.logoH * plan.logo).dp).clip(RoundedCornerShape(3.dp)).background(Color(0x33FFFFFF)).testTag("heroLogo"),
             contentAlignment = Alignment.Center) {
@@ -168,6 +169,11 @@ fun Hero(ch: ChannelEntity?, name: String, progs: List<GuideProgramme>, now: Lon
         // Under the logo, same left edge; at most two lines (when they fit), then "…".
         Text(cur?.title ?: name, fontSize = (b.titleSp * plan.title).sp, color = Color.White, maxLines = plan.titleLines,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = b.gapTitle.dp, bottom = b.gapMeta.dp).testTag("heroTitle"))
+        // Weighted, so it's measured last: it gets the lines the logo, title and meta line leave (up to 2), and its gap
+        // to the meta line only when it shows.
+        cur?.desc?.let {
+            FittedLines(it, 2, b.gapDesc.dp, if (maxHeight != Dp.Infinity) Modifier.weight(1f, fill = false) else Modifier) // unbounded: a weight would get no room
+        }
         Row(Modifier.testTag("heroMeta"), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
             if (cur != null) {
                 Text(duration(cur.stop - cur.start).let { dur ->
@@ -182,30 +188,21 @@ fun Hero(ch: ChannelEntity?, name: String, progs: List<GuideProgramme>, now: Lon
                     modifier = Modifier.weight(1f, fill = false))
                 Text(stringResource(R.string.live_no_guide_info), fontSize = 13.sp, color = LocalTheme.current.colors.muted, maxLines = 1, softWrap = false)
             }
+            // Small outlined boxes: FULL HD, 25 FPS…
             badges.forEach { badge ->
-                Text(badge, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color.White,
-                    modifier = Modifier.border(1.dp, Color(0xB3FFFFFF), RoundedCornerShape(3.dp)).padding(horizontal = 4.dp, vertical = 1.dp))
-            }
-        }
-        // Weighted, so it's measured last: it gets the lines the logo, title and progress bar leave (up to 3).
-        cur?.desc?.let {
-            FittedLines(it, 3, b.gapDesc.dp, if (maxHeight != Dp.Infinity) Modifier.weight(1f, fill = false) else Modifier) // unbounded: a weight would get no room
-        }
-        if (plan.progress) {
-            val f = ((now - cur!!.start).toFloat() / (cur.stop - cur.start)).coerceIn(0f, 1f)
-            Box(Modifier.padding(top = 9.dp).size(210.dp, 2.5.dp).clip(RoundedCornerShape(2.dp)).background(Color(0x24FFFFFF)).testTag("heroProgress")) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(f).background(Color.White))
+                Text(badge, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1,
+                    modifier = Modifier.border(1.dp, Color(0xCCFFFFFF), RoundedCornerShape(2.dp)).padding(horizontal = 5.dp, vertical = 1.dp))
             }
         }
     }
 }
 
-/** The description: at most [maxLines], fewer when the space left is shorter, ending in "…"; nothing when not one fits. */
+/** The description: at most [maxLines], fewer when the space left is shorter, ending in "…", then [gap]; nothing when not one fits. */
 @Composable
-private fun FittedLines(text: String, maxLines: Int, top: Dp, modifier: Modifier) {
+private fun FittedLines(text: String, maxLines: Int, gap: Dp, modifier: Modifier) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
-        val lines = if (constraints.hasBoundedHeight) ((maxHeight - top) / 19.dp).toInt().coerceAtMost(maxLines) else maxLines
+        val lines = if (constraints.hasBoundedHeight) ((maxHeight - gap) / 19.dp).toInt().coerceAtMost(maxLines) else maxLines
         if (lines > 0) Text(text, fontSize = 14.sp, lineHeight = 19.sp, color = Color(0xFFEAF0FF), maxLines = lines,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = top).testTag("heroDesc"))
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = gap).testTag("heroDesc"))
     }
 }

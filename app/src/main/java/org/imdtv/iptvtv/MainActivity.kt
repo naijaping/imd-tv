@@ -100,8 +100,8 @@ class MainActivity : ComponentActivity() {
                 .collect { (on, language, live) -> app.player.setSubtitles(on, language, live) }
         }
         lifecycleScope.launch {
-            (application as IptvApp).container.settings.settings.map { it.clock24h }.distinctUntilChanged()
-                .collect { org.imdtv.iptvtv.ui.use24Hour = it }
+            (application as IptvApp).container.settings.settings.map { it.clockFollowsDevice to it.clock24h }.distinctUntilChanged()
+                .collect { clockPref = it; applyClock() }
         }
         setContent {
             val themeId = app.settings.collectAsState().value.theme
@@ -192,11 +192,18 @@ class MainActivity : ComponentActivity() {
                     if (t == Tab.SERIES) vod.setKind(Kind.SERIES)
                     app.selectTab(t)
                 }
+                // Dim top menu: the unselected items' opacity while focus is elsewhere.
+                val idle = if (settings.dimTopMenu) settings.menuDim.alpha else 1f
                 val nav = @androidx.compose.runtime.Composable {
                     TopNav(tab, onSelect = selectTab, Modifier.onFocusChanged { menuFocused = it.hasFocus }, menuFocus,
                         showClock = settings.showDateTime,
                         showDate = settings.showDate, pingMs = pingMs,
-                        tabs = org.imdtv.iptvtv.ui.visibleTabs(settings.recordingOn))
+                        tabs = org.imdtv.iptvtv.ui.visibleTabs(settings.recordingOn), idleAlpha = idle)
+                }
+                // The Live TV guide: the time, date and ping go to its top right, not in the menu row.
+                val liveNav = @androidx.compose.runtime.Composable {
+                    TopNav(tab, onSelect = selectTab, Modifier.onFocusChanged { menuFocused = it.hasFocus }, menuFocus,
+                        tabs = org.imdtv.iptvtv.ui.visibleTabs(settings.recordingOn), idleAlpha = idle, trailing = false)
                 }
                 val themeId = LocalTheme.current.id
                 // A channel from search: its category becomes the guide's, so zapping and Back behave as from the guide.
@@ -247,7 +254,7 @@ class MainActivity : ComponentActivity() {
                         } else if (top == Screen.Live) when (themeId) {
                             ThemeId.CELESTIAL_PLUS -> PlusGuideScreen(live, nav, full, pingMs)
                             ThemeId.CELESTIAL_RETRO -> if (live.retroGuideOpen) RetroGuideScreen(live, full) else retroMenu(Tab.LIVE)
-                            else -> if (card != null) XcubeLive(live, card, full) else LiveGuideScreen(live, nav, full)
+                            else -> if (card != null) XcubeLive(live, card, full) else LiveGuideScreen(live, liveNav, full, pingMs)
                         }
                         else when {
                             card != null -> XcubeVod(vod, card, app::open, onUsePlaylist = { live.usePlaylistAt(it.providerId, null) })
@@ -311,8 +318,16 @@ class MainActivity : ComponentActivity() {
         (application as IptvApp).container.parental.relock() // "Until the app closes"
     }
 
+    /** Follow the TV (the default) or the app's own 12/24-hour choice. */
+    private var clockPref: Pair<Boolean, Boolean>? = null
+    private fun applyClock() {
+        val (follow, h24) = clockPref ?: return
+        org.imdtv.iptvtv.ui.use24Hour = if (follow) android.text.format.DateFormat.is24HourFormat(this) else h24
+    }
+
     override fun onStart() {
         super.onStart()
+        applyClock() // the TV's 12/24-hour setting may have changed meanwhile
         app.player.toForeground()
         // TV boxes keep the app alive for days: check on every return to it, at most once an hour.
         lifecycleScope.launch { (application as IptvApp).container.updater.check() }

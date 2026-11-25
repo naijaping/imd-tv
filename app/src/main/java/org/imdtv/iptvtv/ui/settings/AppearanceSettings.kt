@@ -52,6 +52,8 @@ import org.imdtv.iptvtv.data.settings.AppSettings
 import org.imdtv.iptvtv.data.settings.guideRowChoices
 import org.imdtv.iptvtv.data.settings.HeaderSize
 import org.imdtv.iptvtv.data.settings.PlayerClock
+import org.imdtv.iptvtv.data.settings.DatePlace
+import org.imdtv.iptvtv.data.settings.MenuDim
 import org.imdtv.iptvtv.data.settings.ThemeId
 import org.imdtv.iptvtv.data.settings.TitleSize
 
@@ -68,6 +70,10 @@ fun AppearanceAppRows(vm: SettingsViewModel, first: FocusRequester, openers: Map
         ChoiceRow(stringResource(R.string.set_a_theme_colour), stringResource(R.string.set_a_theme_colour_expl, stringResource(s.theme.labelRes)), ThemeColour.entries, s.themeColour, { stringResource(it.labelRes) }, default = AppSettings().themeColour) { c -> vm.update { it.copy(themeColour = c) } }
         ChoiceRow(stringResource(R.string.set_a_theme_mode), stringResource(R.string.set_a_theme_mode_expl), listOf(false, true), s.themeDark, { if (it) stringResource(R.string.set_a_mode_dark) else stringResource(R.string.set_a_mode_light) }, default = AppSettings().themeDark, onPick = { d -> vm.update { it.copy(themeDark = d) } })
     }
+    // Dim top menu (every screen with the menu), and how faint.
+    SwitchRow(stringResource(R.string.set_d_dim_menu), stringResource(R.string.set_d_dim_menu_expl), s.dimTopMenu) { on -> vm.update { it.copy(dimTopMenu = on) } }
+    if (s.dimTopMenu) ChoiceRow(stringResource(R.string.set_d_dim_level), stringResource(R.string.set_d_dim_level_expl), MenuDim.entries, s.menuDim, { stringResource(it.labelRes) },
+        default = AppSettings().menuDim) { d -> vm.update { it.copy(menuDim = d) } }
     val dt = ChannelPage.DATE_TIME
     SettingRow(stringResource(dt.titleRes), stringResource(dt.explanationRes), "›", Modifier.focusRequester(openers.getValue(dt))) { onOpen(dt) }
     var confirmReset by remember { mutableStateOf(false) }
@@ -95,6 +101,7 @@ fun AppearanceLiveRows(vm: SettingsViewModel, first: FocusRequester) {
         BrandLogoRow(vm, s)
     }
     SwitchRow(stringResource(R.string.set_a_live_indicator), stringResource(R.string.set_a_live_indicator_expl), s.showLiveIndicator, if (s.glass()) Modifier else f) { on -> vm.update { it.copy(showLiveIndicator = on) } }
+    SwitchRow(stringResource(R.string.set_d_cell_progress), stringResource(R.string.set_d_cell_progress_expl), s.cellProgress) { on -> vm.update { it.copy(cellProgress = on) } }
     SwitchRow(stringResource(R.string.set_a_multi_line), stringResource(R.string.set_a_multi_line_expl), s.multiLineGuide) { on -> vm.update { it.copy(multiLineGuide = on) } }
     ChoiceRow(stringResource(R.string.set_a_title_size), stringResource(R.string.set_a_title_size_live_expl), TitleSize.entries, s.titleSize, { stringResource(it.labelRes) }, default = AppSettings().titleSize, onPick = { v -> vm.update { it.copy(titleSize = v) } })
     ChoiceRow(stringResource(R.string.set_a_epg_text_size), stringResource(R.string.set_a_epg_text_size_expl), org.imdtv.iptvtv.data.settings.EpgTextSize.entries, s.epgTextSize, { stringResource(it.labelRes) }, default = AppSettings().epgTextSize, onPick = { v -> vm.update { it.copy(epgTextSize = v) } })
@@ -114,8 +121,17 @@ fun AppearanceVodRows(vm: SettingsViewModel, first: FocusRequester) {
 fun DateTimeRows(vm: SettingsViewModel, first: FocusRequester) {
     val s by vm.settings.collectAsState()
     SwitchRow(stringResource(R.string.set_a_clock), stringResource(R.string.set_a_clock_expl), s.showDateTime, Modifier.focusRequester(first)) { on -> vm.update { it.copy(showDateTime = on) } }
-    SwitchRow(stringResource(R.string.set_a_date), stringResource(R.string.set_a_date_expl), s.showDate) { on -> vm.update { it.copy(showDate = on) } }
-    SwitchRow(stringResource(R.string.set_a_clock_24h), stringResource(R.string.set_a_clock_24h_expl), s.clock24h) { on -> vm.update { it.copy(clock24h = on) } }
+    // Show date: Off / Under the time / In the Today cell (null = off; other screens show it beside the time either way).
+    val place = s.datePlace.takeIf { s.showDate }
+    ChoiceRow(stringResource(R.string.set_d_show_date), stringResource(R.string.set_d_show_date_expl), listOf(null, DatePlace.UNDER_TIME, DatePlace.TODAY_CELL), place,
+        { stringResource(when (it) { null -> R.string.set_d_date_off; DatePlace.UNDER_TIME -> R.string.set_d_date_under; DatePlace.TODAY_CELL -> R.string.set_d_date_today }) },
+        default = AppSettings().datePlace) { p -> vm.update { if (p == null) it.copy(showDate = false) else it.copy(showDate = true, datePlace = p) } }
+    // Time format: Follow the TV (null) / 24-hour (true) / 12-hour (false).
+    val format = s.clock24h.takeIf { !s.clockFollowsDevice }
+    ChoiceRow(stringResource(R.string.set_d_time_format), stringResource(R.string.set_d_time_format_expl), listOf(null, true, false), format,
+        { stringResource(when (it) { null -> R.string.set_d_time_device; true -> R.string.set_d_time_24; false -> R.string.set_d_time_12 }) }, default = null) { h ->
+        vm.update { if (h == null) it.copy(clockFollowsDevice = true) else it.copy(clockFollowsDevice = false, clock24h = h) }
+    }
     ChoiceRow(stringResource(R.string.set_a_player_clock), stringResource(R.string.set_a_player_clock_expl), PlayerClock.entries, s.playerClock, { stringResource(it.labelRes) }, default = AppSettings().playerClock) { c ->
         vm.update { it.copy(playerClock = c) }
     }

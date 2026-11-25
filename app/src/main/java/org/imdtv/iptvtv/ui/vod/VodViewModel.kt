@@ -186,6 +186,8 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
 
     val focused = MutableStateFlow<VodItem?>(null)
     val details = MutableStateFlow<Map<Long, VodDetail>>(emptyMap())
+    // Every focused title added one (series with all their episodes) for as long as the app ran: keep the recent ones.
+    private val detailCache = org.imdtv.iptvtv.data.SizedLru<Long, VodDetail>(DETAIL_CACHE_UNITS) { 1 + it.episodes.size / 20 }
 
     init {
         viewModelScope.launch { clearQueryOnScopeChange(searchScope, query) }
@@ -237,7 +239,7 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
                 } else src.seriesDetail(item.remoteId).let {
                     VodDetail(it.backdrop, it.plot, it.genre, null, null, null, it.episodes)
                 }
-            }.onSuccess { d -> details.value = details.value + (item.id to d) }
+            }.onSuccess { d -> detailCache[item.id] = d; details.value = detailCache.snapshot() }
                 .onFailure { Log.w("IptvVod", "Detail failed for ${item.name}", it) }
         }
     }
@@ -431,6 +433,8 @@ class VodViewModel(private val app: Application) : AndroidViewModel(app) {
         /** The provider id of Stremio add-on titles (Settings › Addons): no playlist row, never the one in use. */
         const val ADDONS_PROVIDER = -7L
         const val ADDON_SEARCH_MS = 10_000L
+        /** About 100 titles' details (a series counts 1 per 20 episodes more). */
+        const val DETAIL_CACHE_UNITS = 100
 
         /** A stable id for an add-on title, far below every database id and the pseudo ids above. */
         fun addonItemId(k: Kind, remoteId: String): Long = -(1L shl 33) - (("${k.name}|$remoteId").hashCode().toLong() and 0xffffffffL)

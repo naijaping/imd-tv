@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
@@ -52,7 +53,7 @@ import coil.compose.AsyncImage
 import org.imdtv.iptvtv.data.files.BrandLogo
 
 @Composable
-fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen: (ChannelEntity) -> Unit) {
+fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen: (ChannelEntity) -> Unit, pingMs: Int? = null) {
     val state = rememberGuideState(vm)
     val rail by vm.rail.collectAsState()
     val entry by vm.entry.collectAsState()
@@ -79,14 +80,16 @@ fun LiveGuideScreen(vm: LiveViewModel, nav: @Composable () -> Unit, onFullScreen
     }) {
         Preview(vm, visible = state.previewing, screen = screen,
             edge = if (boxed) PreviewEdge.RIM else PreviewEdge.FADE, // rounded like the rest of the glass themes
-            // Fade: the preview reaches the top, where the shifted nav's clock now runs; the badge goes below it.
-            badgeTop = if (boxed) 30.dp else 58.dp,
+            // Fade: the preview reaches the top, under the time, date and ping block (to ~70dp): the badge goes below it.
+            badgeTop = if (boxed) 30.dp else 86.dp,
             // Boxed: a smaller framed preview clear of the description panel; top and height match the hero panel,
             // so the nav pill never overlaps it. Fade: full corner preview, shrunk with the header.
             modifier = Modifier.align(Alignment.TopEnd).then(
                 if (boxed) Modifier.padding(top = 80.dp, end = 30.dp).size(boxH * 16 / 9, boxH)
                 else Modifier.size((300.dp - shift) * 53 / 30, 300.dp - shift)))
-        BrandAndNav(settings.brandLogoPath, settings.brandLogoScale, nav, Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp))
+        TopBar(settings.brandLogoPath, settings.brandLogoScale, nav, {
+            org.imdtv.iptvtv.ui.TopClock(settings.showDateTime, settings.showDate && settings.datePlace == org.imdtv.iptvtv.data.settings.DatePlace.UNDER_TIME, pingMs)
+        }, Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp))
         // Medium/Small: the hero runs up to the preview, so the description fits beside the title.
         val previewW = if (boxed) boxH * 16 / 9 + 30.dp else (300.dp - shift) * 53 / 30
         // Celestial Glass with the faded preview: Sky Glass style, text across ~60% of the screen over the faded video.
@@ -149,24 +152,36 @@ private val BRAND_LOGO_TALLEST = 64.dp
 private val BRAND_LOGO_GAP = 12.dp
 
 /**
- * Top left: the brand logo, then the nav to its right. The logo takes what the nav leaves, up to [BRAND_LOGO_MAX], so
- * the clock and ping at the nav's end stay on screen; the row is the nav's height, so the bar is as tall as before.
- * The logo isn't focusable: Up from the guide still enters the nav on the selected tab.
+ * The top bar: the brand logo far left, the time (with date and ping under it) far right, and the menu pill centred
+ * between them; when that doesn't fit, the menu sits right after the logo, and the logo takes only what is left (up
+ * to [BRAND_LOGO_MAX] × Branding logo size), so nothing overlaps. The row is the menu's height; the logo and the time
+ * block are centred on it and may reach above and below. The logo isn't focusable: Up still enters the menu.
  */
 @Composable
-private fun BrandAndNav(path: String?, scale: Float, nav: @Composable () -> Unit, modifier: Modifier) {
-    Layout(content = { BrandLogoImage(path); Box { nav() } }, modifier) { m, c ->
+internal fun TopBar(path: String?, scale: Float, nav: @Composable () -> Unit, clock: @Composable () -> Unit, modifier: Modifier) {
+    Layout(content = {
+        Box(Modifier.testTag("topLogo")) { BrandLogoImage(path) }; Box(Modifier.testTag("topNav")) { nav() }; Box(Modifier.testTag("topClock")) { clock() }
+    }, modifier) { m, c ->
         val navP = m[1].measure(Constraints(maxHeight = c.maxHeight)) // its natural width
+        val clockP = m[2].measure(Constraints(maxHeight = c.maxHeight))
         val gap = BRAND_LOGO_GAP.roundToPx()
-        val w = (c.maxWidth - navP.width - gap).coerceIn(0, (BRAND_LOGO_MAX * scale).roundToPx())
+        val clockW = if (clockP.width > 0) clockP.width + gap else 0
+        val w = (c.maxWidth - navP.width - clockW - gap).coerceIn(0, (BRAND_LOGO_MAX * scale).roundToPx())
         val logoP = m[0].measure(Constraints.fixed(w, (BRAND_LOGO_HEIGHT * scale).coerceAtMost(BRAND_LOGO_TALLEST).roundToPx()))
-        val navX = if (w > 0) w + gap else 0
-        layout(c.constrainWidth(navX + navP.width), c.constrainHeight(navP.height)) {
-            logoP.place(0, (navP.height - logoP.height) / 2) // centred on the nav; may reach a little above and below it
+        val left = if (w > 0) w + gap else 0
+        val right = c.maxWidth - clockW - navP.width // the furthest right the menu may start
+        val navX = ((c.maxWidth - navP.width) / 2).coerceAtMost(right).coerceAtLeast(left)
+        layout(c.maxWidth, c.constrainHeight(navP.height)) {
+            logoP.place(0, (navP.height - logoP.height) / 2)
             navP.place(navX, 0)
+            // The time's first line on the menu's middle: its date and ping hang below.
+            clockP.place(c.maxWidth - clockP.width, (navP.height - CLOCK_LINE.roundToPx()) / 2)
         }
     }
 }
+
+/** The time line's height in [TopClock] (16sp text on a 20sp line; font scale is pinned to 1). */
+private val CLOCK_LINE = 20.dp
 
 /** The chosen image scaled to fit (aspect kept), left-aligned; the app's logo by default or when the copy is gone. */
 @Composable

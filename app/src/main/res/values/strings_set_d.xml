@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Live TV guide top bar: time and date, dimmed menu, timeline progress. -->
+<resources>
+    <string name="set_d_dim_light">Light</string>
+    <string name="set_d_dim_medium">Medium</string>
+    <string name="set_d_dim_strong">Strong</string>
+    <string name="set_d_show_date">Show date</string>
+    <string name="set_d_show_date_expl">In the TV guide: under the time at the top right, or in the guide\'s Today cell. Other screens show it beside the time</string>
+    <string name="set_d_date_off">Off</string>
+    <string name="set_d_date_under">Under the time</string>
+    <string name="set_d_date_today">In the Today cell</string>
+    <string name="set_d_time_format">Time format</string>
+    <string name="set_d_time_format_expl">12-hour (8.30pm) or 24-hour (20:30). Follow the TV uses the TV\'s own setting</string>
+    <string name="set_d_time_device">Follow the TV</string>
+    <string name="set_d_time_24">24-hour</string>
+    <string name="set_d_time_12">12-hour</string>
+    <string name="set_d_dim_menu">Dim top menu when not in use</string>
+    <string name="set_d_dim_menu_expl">The menu\'s items fade while you\'re in the guide or a list, and light up when you move up to them. The selected tab, logo and time stay clear</string>
+    <string name="set_d_dim_level">Dim level</string>
+    <string name="set_d_dim_level_expl">How faint the menu gets while not in use</string>
+    <string name="set_d_cell_progress">Progress in the highlighted programme</string>
+    <string name="set_d_cell_progress_expl">A thin bar along the bottom of the highlighted programme shows how far it has got. The line under the times always shows now</string>
+    <string name="live_today_date">Today · %1$s</string>
+</resources>
