@@ -104,8 +104,6 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.room.testing)
-    // Debug builds only: reports leaked screens/views/view models (logcat tag LeakCanary; "Leaks" app). Never in release.
-    debugImplementation(libs.leakcanary)
     // Layout tests that render composables under Robolectric (e.g. the guide header at every size).
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
