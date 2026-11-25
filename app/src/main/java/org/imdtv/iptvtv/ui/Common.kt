@@ -6,6 +6,9 @@ import org.imdtv.iptvtv.ui.theme.LocalTheme
 
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
@@ -79,41 +82,78 @@ fun FocusBox(
 fun TopNav(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier, selectedFocus: FocusRequester? = null, showClock: Boolean = true,
            showDate: Boolean = false, pingMs: Int? = null, tabs: List<Tab> = visibleTabs(false),
            /** Unselected items' opacity while focus is elsewhere (Dim top menu); 1 = never dimmed. */ idleAlpha: Float = 1f,
-           /** False: the clock and ping aren't in the row (the Live TV guide shows them at the top right itself). */ trailing: Boolean = true) {
+           /** False: the clock and ping aren't in the row (the Live TV guide shows them at the top right itself). */ trailing: Boolean = true,
+           /** Settings › Top menu: order, names and styles; null = [tabs] with their default names and icons + names. */ items: List<MenuItemSpec>? = null) {
+    val list = items ?: tabs.map { MenuItemSpec(it, null, false) }
     // Dim top menu: fades in when focus comes up into the menu (~180 ms) and out when it leaves; nothing runs in between.
     var hasFocus by remember { mutableStateOf(false) }
     val dim by androidx.compose.animation.core.animateFloatAsState(if (hasFocus) 1f else idleAlpha, androidx.compose.animation.core.tween(180), label = "menuDim")
     val liquid = LocalGlassBackdrop.current != null
+    // Names share what width there is: each ends in "…" before the menu could reach the time or the logo.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+    val named = list.count { !it.iconOnly }.coerceAtLeast(1)
+    val labelMax = if (!constraints.hasBoundedWidth) LABEL_MAX
+        else ((maxWidth - (if (trailing) 140.dp else 0.dp) - 12.dp - (40.dp + 4.dp) * list.size - 6.dp * named) / named).coerceIn(24.dp, LABEL_MAX)
     // Entering the menu from below lands on the current tab, not the nearest one.
     Row(
-        modifier.onFocusChanged { hasFocus = it.hasFocus }.focusProperties { enter = { selectedFocus ?: FocusRequester.Default } }.focusGroup()
-            // A rounded see-through pill (Liquid Glass: its glass pill instead).
+        Modifier.onFocusChanged { hasFocus = it.hasFocus }.focusProperties { enter = { selectedFocus ?: FocusRequester.Default } }.focusGroup()
+            // A rounded see-through pill (Liquid Glass: its glass pill instead). Not clipped: a focused icon-only item's
+            // name label hangs below it.
             .then(if (liquid) Modifier.glass(RoundedCornerShape(22.dp)).padding(5.dp)
-                else Modifier.clip(RoundedCornerShape(22.dp)).background(Color(0x1AFFFFFF)).padding(horizontal = 5.dp, vertical = 4.dp)),
+                else Modifier.background(Color(0x1AFFFFFF), RoundedCornerShape(22.dp)).padding(horizontal = 5.dp, vertical = 4.dp)),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { t ->
-            FocusBox(onClick = { onSelect(t) }, modifier = if (t == selected && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier) { f ->
+        list.forEach { item ->
+            val t = item.tab
+            val label = item.customName ?: stringResource(t.labelRes)
+            FocusBox(onClick = { onSelect(t) }, modifier = (if (t == selected && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier).testTag("menu_${t.name}")) { f ->
                 val fg = when { f -> Color.Black; t == selected -> Color.White; else -> LocalTheme.current.colors.muted }
                 Row(
-                    // The selected tab stays clear when the rest dims.
+                    // The selected tab stays clear when the rest dims. One height for both styles, so highlights match.
                     Modifier.graphicsLayer { alpha = if (t == selected || f) 1f else dim }.clip(RoundedCornerShape(15.dp))
                         .background(when { f -> Color.White; t == selected -> Color(0x1FFFFFFF); else -> Color.Transparent })
-                        .padding(horizontal = 13.dp, vertical = 5.dp),
+                        .heightIn(min = 26.dp).padding(horizontal = 13.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(painterResource(t.icon), contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
-                    Text("  " + stringResource(t.labelRes), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = fg)
+                    Icon(painterResource(t.icon), contentDescription = label.takeIf { item.iconOnly }, tint = fg, modifier = Modifier.size(14.dp))
+                    if (!item.iconOnly) Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = fg, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp).widthIn(max = labelMax))
+                }
+                // Icon only: its name while it has focus, in a small label under it (its own window: nothing moves).
+                if (item.iconOnly && f) androidx.compose.ui.window.Popup(popupPositionProvider = BelowAnchor,
+                    properties = androidx.compose.ui.window.PopupProperties(focusable = false, clippingEnabled = false)) {
+                    Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.Black, maxLines = 1,
+                        modifier = Modifier.padding(top = 6.dp).background(Color.White, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp).testTag("menuFocusLabel"))
                 }
             }
         }
         if (trailing) {
             // The time stays readable when the menu dims: never below 85%.
-            Box(Modifier.graphicsLayer { alpha = maxOf(dim, .85f) }) { if (showClock || showDate) NavClock(showClock, showDate) }
+            Box(Modifier.graphicsLayer { alpha = maxOf(dim, .85f) }.testTag("menuClock")) { if (showClock || showDate) NavClock(showClock, showDate) }
             pingMs?.let { Text(pingLabel(it), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = LocalTheme.current.colors.muted, modifier = Modifier.padding(start = 14.dp, end = 8.dp)) }
         }
     }
+    }
+}
+
+/** A top menu item as shown: its tab (its identity), custom name (null = the translated default) and style. */
+data class MenuItemSpec(val tab: Tab, val customName: String?, val iconOnly: Boolean)
+
+/** A menu name's widest before "…". */
+private val LABEL_MAX = 120.dp
+
+/** Settings › Top menu applied: the items in the user's order, with Recordings only while recording is on. */
+fun menuItems(s: org.imdtv.iptvtv.data.settings.AppSettings): List<MenuItemSpec> =
+    org.imdtv.iptvtv.data.settings.TopMenu.normalized(s.topMenu, Tab.entries.map { it.name }).mapNotNull { e ->
+        Tab.entries.find { it.name == e.id }?.let { MenuItemSpec(it, e.name, e.iconOnly) }
+    }.filter { it.tab != Tab.RECORDINGS || s.recordingOn }
+
+/** Places a popup centred under its anchor (an icon-only item's name). */
+private object BelowAnchor : androidx.compose.ui.window.PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: androidx.compose.ui.unit.IntRect, windowSize: androidx.compose.ui.unit.IntSize,
+                                   layoutDirection: androidx.compose.ui.unit.LayoutDirection, popupContentSize: androidx.compose.ui.unit.IntSize) =
+        androidx.compose.ui.unit.IntOffset((anchorBounds.center.x - popupContentSize.width / 2).coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)), anchorBounds.bottom)
 }
 
 /** Its own composable, so the minute tick recomposes only this Text, not the nav. */

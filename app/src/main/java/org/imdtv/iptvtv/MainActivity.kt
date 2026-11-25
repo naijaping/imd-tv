@@ -198,12 +198,12 @@ class MainActivity : ComponentActivity() {
                     TopNav(tab, onSelect = selectTab, Modifier.onFocusChanged { menuFocused = it.hasFocus }, menuFocus,
                         showClock = settings.showDateTime,
                         showDate = settings.showDate, pingMs = pingMs,
-                        tabs = org.imdtv.iptvtv.ui.visibleTabs(settings.recordingOn), idleAlpha = idle)
+                        items = org.imdtv.iptvtv.ui.menuItems(settings), idleAlpha = idle)
                 }
                 // The Live TV guide: the time, date and ping go to its top right, not in the menu row.
                 val liveNav = @androidx.compose.runtime.Composable {
                     TopNav(tab, onSelect = selectTab, Modifier.onFocusChanged { menuFocused = it.hasFocus }, menuFocus,
-                        tabs = org.imdtv.iptvtv.ui.visibleTabs(settings.recordingOn), idleAlpha = idle, trailing = false)
+                        items = org.imdtv.iptvtv.ui.menuItems(settings), idleAlpha = idle, trailing = false)
                 }
                 val themeId = LocalTheme.current.id
                 // A channel from search: its category becomes the guide's, so zapping and Back behave as from the guide.

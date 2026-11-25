@@ -59,7 +59,7 @@ import org.imdtv.iptvtv.ui.FocusBox
 enum class SettingsGroup(val title: String, @StringRes val labelRes: Int) {
     PLAYLISTS("Playlists", R.string.set_b_group_playlists), MEDIA_SERVERS("Media servers", R.string.set_b_group_media_servers), ADDONS("Addons", R.string.set_c_group_addons), CHANNELS("Channels & categories", R.string.set_b_group_channels),
     EPG("TV guide (EPG)", R.string.set_b_group_epg), VOD("Movies & Series", R.string.set_b_group_vod), PLAYBACK("Playback", R.string.set_b_group_playback),
-    APPEARANCE("Appearance", R.string.set_b_group_appearance), BEHAVIOUR("App behaviour", R.string.set_b_group_behaviour),
+    APPEARANCE("Appearance", R.string.set_b_group_appearance), TOP_MENU("Top menu", R.string.set_e_group), BEHAVIOUR("App behaviour", R.string.set_b_group_behaviour),
     BACKUP("Backup & sync", R.string.set_b_group_backup), ABOUT("About", R.string.set_b_group_about),
 }
 
@@ -270,6 +270,7 @@ fun SettingsScreen(vm: SettingsViewModel, onAddPlaylist: () -> Unit, onEditPlayl
                         val subs = ChannelPage.SUBTITLES
                         SettingRow(stringResource(subs.titleRes), stringResource(subs.explanationRes), "›", Modifier.focusRequester(openers.getValue(subs))) { park(); page = subs }
                     }
+                    SettingsGroup.TOP_MENU -> TopMenuRows(vm, first)
                     SettingsGroup.APPEARANCE -> PageRows(listOf(ChannelPage.APPEARANCE_APP, ChannelPage.APPEARANCE_LIVE, ChannelPage.APPEARANCE_VOD), vm, rowsFocus, openers) { park(); page = it }
                     SettingsGroup.BEHAVIOUR -> {
                         SwitchRow(stringResource(R.string.set_b_last_channel), stringResource(R.string.set_b_last_channel_expl), s.lastChannelOnStart, first) { on ->

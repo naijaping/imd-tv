@@ -34,6 +34,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
     private val dimTopMenu = booleanPreferencesKey("dim_top_menu")
     private val menuDim = stringPreferencesKey("menu_dim")
     private val heroProgress = booleanPreferencesKey("hero_progress")
+    private val topMenu = stringPreferencesKey("top_menu")
     private val themeLooks = stringPreferencesKey("theme_looks")
     private val guidesOff = androidx.datastore.preferences.core.stringSetPreferencesKey("guides_off")
     private val liveSubtitlesOn = booleanPreferencesKey("live_subtitles_on")
@@ -134,6 +135,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
             dimTopMenu = this[dimTopMenu] ?: d.dimTopMenu,
             menuDim = MenuDim.entries.find { it.name == this[menuDim] } ?: d.menuDim,
             heroProgress = this[heroProgress] ?: d.heroProgress,
+            topMenu = TopMenu.decode(this[topMenu]),
             guidesOff = this[guidesOff].orEmpty(),
             themeLooks = this[themeLooks]?.split('|')?.mapNotNull { e -> e.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap().orEmpty(),
             liveSubtitlesOn = this[liveSubtitlesOn] ?: d.liveSubtitlesOn,
@@ -221,6 +223,7 @@ class SettingsRepository(private val prefs: DataStore<Preferences>) {
         this[dimTopMenu] = s.dimTopMenu
         this[menuDim] = s.menuDim.name
         this[heroProgress] = s.heroProgress
+        if (s.topMenu.isEmpty()) remove(topMenu) else this[topMenu] = TopMenu.encode(s.topMenu)
         this[guidesOff] = s.guidesOff
         this[themeLooks] = s.themeLooks.entries.joinToString("|") { "${it.key}=${it.value}" }
         this[liveSubtitlesOn] = s.liveSubtitlesOn

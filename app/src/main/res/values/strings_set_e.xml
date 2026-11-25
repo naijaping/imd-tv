@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings › Top menu. -->
+<resources>
+    <string name="set_e_group">Top menu</string>
+    <string name="set_e_intro">The menu at the top of the TV guide, Movies, Series and Search. OK on an item picks it up: move it with the arrows, OK to drop it, Back to put it back.</string>
+    <string name="set_e_all_named">Set all to icon + name</string>
+    <string name="set_e_all_named_expl">Every item shows its icon and its name</string>
+    <string name="set_e_all_icons">Set all to icon only</string>
+    <string name="set_e_all_icons_expl">Every item shows just its icon; its name appears under it while it\'s focused</string>
+    <string name="set_e_items">Items (left to right)</string>
+    <string name="set_e_moving">Moving: arrows to move, OK to drop, Back to cancel</string>
+    <string name="set_e_recordings_off">Shows when Recording is on (Settings › Playback)</string>
+    <string name="set_e_icon_name">Icon + name</string>
+    <string name="set_e_icon_only">Icon only</string>
+    <string name="set_e_renamed_from">was %1$s</string>
+    <string name="set_e_rename">Rename</string>
+    <string name="set_e_show_icon_only">Icon only</string>
+    <string name="set_e_show_name">Icon + name</string>
+    <string name="set_e_reset_name">Reset name</string>
+    <string name="set_e_name_label">Name (up to %1$d characters; empty for “%2$s”)</string>
+    <string name="set_e_reset">Reset top menu to default</string>
+    <string name="set_e_reset_expl">The default order, names and icons + names</string>
+    <string name="set_e_reset_confirm">Press OK again to reset the top menu</string>
+</resources>

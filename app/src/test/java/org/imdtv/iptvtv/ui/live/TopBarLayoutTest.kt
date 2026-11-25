@@ -55,19 +55,32 @@ class TopBarLayoutTest {
     private fun check(density: Density) {
         var scale by mutableStateOf(1f)
         var tabs by mutableStateOf(Tab.entries.toList())
+        var styles by mutableStateOf<(Tab) -> org.imdtv.iptvtv.ui.MenuItemSpec>({ org.imdtv.iptvtv.ui.MenuItemSpec(it, null, false) })
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides density,
                 androidx.tv.material3.LocalTextStyle provides androidx.tv.material3.LocalTextStyle.current.copy(fontFamily = Inter)) {
                 Box(Modifier.size(960.dp, 540.dp)) {
-                    TopBar(null, scale, { TopNav(Tab.LIVE, {}, tabs = tabs, trailing = false, idleAlpha = .45f) },
+                    TopBar(null, scale, { TopNav(Tab.LIVE, {}, items = tabs.map(styles), trailing = false, idleAlpha = .45f) },
                         { TopClock(showClock = true, dateUnder = true, pingMs = 29) }, Modifier.padding(start = 24.dp, top = 22.dp, end = 24.dp))
                 }
             }
         }
-        for (t in listOf(Tab.entries.toList(), Tab.entries.filter { it != Tab.RECORDINGS })) for (s in org.imdtv.iptvtv.data.settings.BRAND_SCALES) {
-            tabs = t; scale = s
+        // Top menu settings: defaults, every item renamed to 16 characters, long names mixed with icon only, all icons.
+        val long = "Recordings Arch."
+        val menus = listOf<Pair<String, (Tab) -> org.imdtv.iptvtv.ui.MenuItemSpec>>(
+            "default" to { t -> org.imdtv.iptvtv.ui.MenuItemSpec(t, null, false) },
+            "all long names" to { t -> org.imdtv.iptvtv.ui.MenuItemSpec(t, long, false) },
+            "mixed" to { t -> org.imdtv.iptvtv.ui.MenuItemSpec(t, long, t.ordinal % 2 == 0) },
+            "all icons" to { t -> org.imdtv.iptvtv.ui.MenuItemSpec(t, null, true) },
+        )
+        for ((menu, style) in menus) for (t in listOf(Tab.entries.toList(), Tab.entries.filter { it != Tab.RECORDINGS })) for (s in org.imdtv.iptvtv.data.settings.BRAND_SCALES) {
+            tabs = t; scale = s; styles = style
             rule.waitForIdle()
-            val where = "scale=$s tabs=${t.size} @${density.density}"
+            val where = "$menu scale=$s tabs=${t.size} @${density.density}"
+            // Even spacing between items, whatever their styles.
+            val items = t.map { rule.onNodeWithTag("menu_${it.name}").getUnclippedBoundsInRoot() }
+            val gaps = items.zipWithNext { a, b -> (b.left - a.right).value }
+            assertTrue("$where: uneven gaps $gaps", gaps.max() - gaps.min() < .6f)
             val logo = rule.onNodeWithTag("topLogo").getUnclippedBoundsInRoot()
             val nav = rule.onNodeWithTag("topNav").getUnclippedBoundsInRoot()
             val clock = rule.onNodeWithTag("topClock").getUnclippedBoundsInRoot()
@@ -77,5 +90,24 @@ class TopBarLayoutTest {
             assertTrue("$where: time not at the right edge (${clock.right})", kotlin.math.abs(clock.right.value - 936f) < 2f)
             assertTrue("$where: top bar below the header line (${clock.bottom}, ${logo.bottom})", clock.bottom.value <= 80f && logo.bottom.value <= 80f && logo.top.value >= 0f)
         }
+    }
+
+    /** Movies, Series, Search: the time and ping stay inside the menu row and on screen, even with every name long. */
+    @Config(qualifiers = "w960dp-h540dp-land-xhdpi") @Test fun timeInRowStaysOnScreen() {
+        rule.setContent {
+            CompositionLocalProvider(androidx.tv.material3.LocalTextStyle provides androidx.tv.material3.LocalTextStyle.current.copy(fontFamily = Inter)) {
+                Box(Modifier.size(960.dp, 540.dp)) {
+                    Box(Modifier.padding(start = 50.dp, top = 22.dp)) {
+                        TopNav(Tab.MOVIES, {}, showClock = true, showDate = true, pingMs = 29,
+                            items = Tab.entries.map { org.imdtv.iptvtv.ui.MenuItemSpec(it, "Recordings Arch.", false) })
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val clock = rule.onNodeWithTag("menuClock").getUnclippedBoundsInRoot()
+        val last = rule.onNodeWithTag("menu_SETTINGS").getUnclippedBoundsInRoot()
+        assertTrue("time off screen: ${clock.right}", clock.right.value <= 960f && clock.left >= last.right)
+        assertTrue("time squeezed: ${clock.right - clock.left}", (clock.right - clock.left).value > 60f)
     }
 }

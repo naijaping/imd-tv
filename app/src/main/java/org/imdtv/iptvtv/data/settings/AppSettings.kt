@@ -134,6 +134,8 @@ data class AppSettings(
     /** The top menu's unselected items fade to [menuDim] while focus is elsewhere; full brightness when it has focus. */
     val dimTopMenu: Boolean = true,
     val menuDim: MenuDim = MenuDim.MEDIUM,
+    /** Settings › Top menu: order, names and styles by item id; empty = the default (see TopMenu.normalized). */
+    val topMenu: List<TopMenuEntry> = emptyList(),
     /** TV guide header: the programme's progress bar under its details. */
     val heroProgress: Boolean = true,
     val showPing: Boolean = false,

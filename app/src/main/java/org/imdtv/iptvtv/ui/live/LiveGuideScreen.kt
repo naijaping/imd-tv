@@ -162,10 +162,11 @@ internal fun TopBar(path: String?, scale: Float, nav: @Composable () -> Unit, cl
     Layout(content = {
         Box(Modifier.testTag("topLogo")) { BrandLogoImage(path) }; Box(Modifier.testTag("topNav")) { nav() }; Box(Modifier.testTag("topClock")) { clock() }
     }, modifier) { m, c ->
-        val navP = m[1].measure(Constraints(maxHeight = c.maxHeight)) // its natural width
         val clockP = m[2].measure(Constraints(maxHeight = c.maxHeight))
         val gap = BRAND_LOGO_GAP.roundToPx()
         val clockW = if (clockP.width > 0) clockP.width + gap else 0
+        // The menu gets what the time leaves: its names shorten ("…") rather than run into the time.
+        val navP = m[1].measure(Constraints(maxWidth = (c.maxWidth - clockW).coerceAtLeast(0), maxHeight = c.maxHeight))
         val w = (c.maxWidth - navP.width - clockW - gap).coerceIn(0, (BRAND_LOGO_MAX * scale).roundToPx())
         val logoP = m[0].measure(Constraints.fixed(w, (BRAND_LOGO_HEIGHT * scale).coerceAtMost(BRAND_LOGO_TALLEST).roundToPx()))
         val left = if (w > 0) w + gap else 0
