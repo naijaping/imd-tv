@@ -647,7 +647,16 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             guideBump.value++
         }
     }
-    /** null = follow the EPG source's offset. */
+    /**
+     * The channel's offset read afresh from the store the guide uses (a sync may have changed it since the list loaded):
+     * its own override, and its linked guide source's.
+     */
+    suspend fun channelOffset(ch: ChannelEntity): org.imdtv.iptvtv.data.epg.ChannelOffset {
+        val own = (c.db.channelDao().get(ch.id) ?: ch).epgOffsetMinutes
+        val source = c.db.epgDao().linksFor(listOf(ch.id)).firstOrNull()?.let { c.db.epgDao().source(it.sourceId) }
+        return org.imdtv.iptvtv.data.epg.ChannelOffset(own, source?.offsetMinutes ?: 0)
+    }
+    /** null = follow the EPG source's offset. Only reloads the guide rows from the database: no guide download. */
     fun setEpgOffset(ch: ChannelEntity, minutes: Int?) {
         viewModelScope.launch { c.db.channelDao().setEpgOffset(ch.id, minutes); guideBump.value++ }
     }

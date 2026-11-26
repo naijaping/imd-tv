@@ -129,4 +129,8 @@
     <string name="live_parental_locked">%1$s is vergrendeld door ouderlijk toezicht.</string>
     <string name="live_parental_locked_app">De app is gesloten sinds de pincode voor het laatst is ingevoerd.</string>
     <string name="live_parental_locked_ok">Druk op OK om de pincode in te voeren.</string>
+    <string name="live_offset_none">Geen verschuiving</string>
+    <string name="live_offset_current">%1$s  ✓ huidig</string>
+    <string name="live_offset_current_guide">%1$s  ✓ huidig · uit de gids</string>
+    <string name="live_offset_from_guide">%1$s (uit de gids)</string>
 </resources>

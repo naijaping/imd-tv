@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -372,7 +373,8 @@ private fun GuideRow(
                     .then(if (fill && !style.boxed) Modifier.shadow(14.dp, RoundedCornerShape(5.dp), ambientColor = Color(0xFFA0BEFF), spotColor = Color(0xFFA0BEFF)) else Modifier)
                     .background(if (moving) Color(0xFFE5A00D) else if (fill) colors.focus else colors.cell, if (style.boxed) BOX else PILL)
                     .then(if (f && !fill) Modifier.border(1.5.dp, colors.focus, if (style.boxed) BOX else PILL) else Modifier)
-                    .padding(horizontal = 11.dp),
+                    // Logo only: the logo's left edge on the programme titles' (10dp in), as a name's nearly is.
+                    .padding(start = if (logo != null && display == org.imdtv.iptvtv.data.settings.GuideChannelDisplay.LOGO) 10.dp else 11.dp, end = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val fg = if (moving) Color.Black else if (fill) colors.onFocus else Color.White
@@ -393,9 +395,9 @@ private fun GuideRow(
                     if (!style.numberFirst) number?.let { Text("  $it", fontSize = style.sp(12f), color = fg.copy(alpha = .85f)) }
                 } else if (logo != null) {
                     if (style.numberFirst) number?.let { Text("$it  ", fontSize = style.sp(14f) * org.imdtv.iptvtv.ui.LocalTitleScale.current, fontWeight = style.font, color = fg) }
-                    Box(Modifier.weight(1f).fillMaxHeight().padding(vertical = 3.dp), contentAlignment = Alignment.CenterStart) {
-                        org.imdtv.iptvtv.ui.ChannelLogo(ch, logo, Modifier.fillMaxSize(), fallback = nameText)
-                    }
+                    // Every logo in the same box on the column's left edge, trimmed and fitted; the name there if it has none.
+                    val (boxW, boxH) = org.imdtv.iptvtv.ui.ListLogoSize.box(style.rowHeight, style.channelCol - 5.dp)
+                    org.imdtv.iptvtv.ui.ListLogo(ch, logo, boxW, boxH, Modifier.weight(1f).fillMaxHeight().testTag("logoCell"), fallback = nameText)
                     if (ch.hasCatchUp) CatchUpClock(fg, Modifier.padding(start = 6.dp))
                     if (!style.numberFirst) number?.let { Text("  $it", fontSize = style.sp(12f), color = fg.copy(alpha = .85f)) }
                 } else if (style.numberFirst) {

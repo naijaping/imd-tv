@@ -129,4 +129,8 @@
     <string name="live_parental_locked">%1$s, ebeveyn denetimi tarafından kilitlendi.</string>
     <string name="live_parental_locked_app">PIN en son girildiğinden beri uygulama kapatıldı.</string>
     <string name="live_parental_locked_ok">PIN girmek için Tamam\'a basın.</string>
+    <string name="live_offset_none">Kayma yok</string>
+    <string name="live_offset_current">%1$s  ✓ geçerli</string>
+    <string name="live_offset_current_guide">%1$s  ✓ geçerli · rehberden</string>
+    <string name="live_offset_from_guide">%1$s (rehberden)</string>
 </resources>

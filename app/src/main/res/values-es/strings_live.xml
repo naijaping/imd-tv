@@ -129,4 +129,8 @@
     <string name="live_parental_locked">%1$s está bloqueado por el control parental.</string>
     <string name="live_parental_locked_app">La aplicación se ha cerrado desde la última vez que se introdujo el PIN.</string>
     <string name="live_parental_locked_ok">Pulsa OK para introducir el PIN.</string>
+    <string name="live_offset_none">Sin desfase</string>
+    <string name="live_offset_current">%1$s  ✓ actual</string>
+    <string name="live_offset_current_guide">%1$s  ✓ actual · de la guía</string>
+    <string name="live_offset_from_guide">%1$s (de la guía)</string>
 </resources>

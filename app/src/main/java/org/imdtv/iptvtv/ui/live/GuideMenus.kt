@@ -22,7 +22,9 @@ import org.imdtv.iptvtv.data.db.SortBy
 import org.imdtv.iptvtv.data.catalogue.displayName
 import org.imdtv.iptvtv.data.db.CategoryEntity
 import org.imdtv.iptvtv.data.db.ChannelEntity
-import org.imdtv.iptvtv.data.epg.formatOffset
+import org.imdtv.iptvtv.data.epg.ChannelOffset
+import org.imdtv.iptvtv.data.epg.offsetChoices
+import org.imdtv.iptvtv.data.epg.offsetText
 import org.imdtv.iptvtv.data.repo.RailEntry
 import org.imdtv.iptvtv.ui.ContextMenu
 import org.imdtv.iptvtv.ui.TextPrompt
@@ -147,10 +149,15 @@ fun GuideMenus(vm: LiveViewModel, state: GuideState) {
             else add(stringResource(R.string.live_menu_record_now) to { vm.recordNow(m.ch); state.menu = null })
             add(stringResource(R.string.live_menu_record_later) to { state.menu = GuideMenu.RecordLater(m.ch) })
         }) { state.menu = GuideMenu.Channel(m.ch) }
-        is GuideMenu.GuideOptions -> ContextMenu(stringResource(R.string.live_menu_guide_options_title, m.ch.displayName(strip)), listOf(
-            stringResource(R.string.live_menu_use_guide_from) to { state.menu = GuideMenu.UseGuideFrom(m.ch) },
-            stringResource(R.string.live_menu_epg_offset, m.ch.epgOffsetMinutes?.let(::formatOffset) ?: stringResource(R.string.live_from_the_guide)) to { state.menu = GuideMenu.EpgOffset(m.ch) },
-        )) { state.menu = GuideMenu.Channel(m.ch) }
+        is GuideMenu.GuideOptions -> {
+            val off by androidx.compose.runtime.produceState(ChannelOffset(m.ch.epgOffsetMinutes, 0), m.ch.id) { value = vm.channelOffset(m.ch) }
+            val none = stringResource(R.string.live_offset_none)
+            val shown = offsetText(off.inUse, none).let { if (off.own == null && off.guide != 0) stringResource(R.string.live_offset_from_guide, it) else it }
+            ContextMenu(stringResource(R.string.live_menu_guide_options_title, m.ch.displayName(strip)), listOf(
+                stringResource(R.string.live_menu_use_guide_from) to { state.menu = GuideMenu.UseGuideFrom(m.ch) },
+                stringResource(R.string.live_menu_epg_offset, shown) to { state.menu = GuideMenu.EpgOffset(m.ch) },
+            )) { state.menu = GuideMenu.Channel(m.ch) }
+        }
         is GuideMenu.AddTo -> ContextMenu(stringResource(R.string.live_menu_add_to_title, m.ch.displayName(strip)),
             groups.map { g -> g.name to { vm.addToGroup(m.ch, g.id); state.menu = null } } +
                 (stringResource(R.string.live_menu_new_category_item) to { state.menu = GuideMenu.NewGroup(m.ch) })) { state.menu = null }
@@ -177,12 +184,15 @@ fun GuideMenus(vm: LiveViewModel, state: GuideState) {
                     vm.jumpToDay(m.ch, t, m.windowMin); state.menu = null } }) { state.menu = null }
         }
         is GuideMenu.EpgOffset -> {
-            // −12 h … +12 h in 30-minute steps; overrides the EPG source's offset for this channel only.
-            val steps = (-720..720 step 30).toList()
+            // −12 h … +12 h in 30-minute steps; overrides the EPG source's offset for this channel only. The value in use
+            // (read afresh, synced ones included) is ticked and focused, and listed in its place when it isn't a step.
+            val off = androidx.compose.runtime.produceState<ChannelOffset?>(null, m.ch.id) { value = vm.channelOffset(m.ch) }.value ?: return
+            val none = stringResource(R.string.live_offset_none)
+            val steps = offsetChoices(off.inUse)
+            val mark = if (off.own == null) R.string.live_offset_current_guide else R.string.live_offset_current
             val items = listOf(stringResource(R.string.live_menu_use_guide_offset) to { vm.setEpgOffset(m.ch, null); state.menu = null }) +
-                steps.map { s -> formatOffset(s) to { vm.setEpgOffset(m.ch, s); state.menu = null } }
-            ContextMenu(stringResource(R.string.live_menu_epg_offset_title, m.ch.displayName(strip)), items,
-                (steps.indexOf(m.ch.epgOffsetMinutes ?: 0) + 1).takeIf { it > 0 } ?: 0) { state.menu = null } // on the current value, else 0:00
+                steps.map { s -> offsetText(s, none).let { if (s == off.inUse) stringResource(mark, it) else it } to { vm.setEpgOffset(m.ch, s); state.menu = null } }
+            ContextMenu(stringResource(R.string.live_menu_epg_offset_title, m.ch.displayName(strip)), items, steps.indexOf(off.inUse) + 1) { state.menu = null }
         }
         is GuideMenu.CatchUp -> {
             val list by androidx.compose.runtime.produceState<List<org.imdtv.iptvtv.data.repo.GuideProgramme>?>(null, m.ch) { value = vm.catchUpProgrammes(m.ch) }

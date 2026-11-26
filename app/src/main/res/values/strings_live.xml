@@ -131,4 +131,8 @@
     <string name="live_rail_jump_hint">Hold up: top / previous playlist\nHold down: next playlist / bottom</string>
     <string name="live_no_channels_in_category">No channels in this category</string>
     <string name="live_loading_channels">"  Loading channels…"</string>
+    <string name="live_offset_none">No offset</string>
+    <string name="live_offset_current">%1$s  ✓ current</string>
+    <string name="live_offset_current_guide">%1$s  ✓ current · from the guide</string>
+    <string name="live_offset_from_guide">%1$s (from the guide)</string>
 </resources>

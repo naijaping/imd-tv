@@ -129,4 +129,8 @@
     <string name="live_parental_locked">%1$s është i kyçur nga kontrolli prindëror.</string>
     <string name="live_parental_locked_app">Aplikacioni është mbyllur që nga hyrja e fundit e PIN-it.</string>
     <string name="live_parental_locked_ok">Shtypni OK për të shkruar PIN-in.</string>
+    <string name="live_offset_none">Pa zhvendosje</string>
+    <string name="live_offset_current">%1$s  ✓ aktuale</string>
+    <string name="live_offset_current_guide">%1$s  ✓ aktuale · nga programi</string>
+    <string name="live_offset_from_guide">%1$s (nga programi)</string>
 </resources>

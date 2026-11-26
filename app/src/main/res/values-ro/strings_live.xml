@@ -129,4 +129,8 @@
     <string name="live_parental_locked">%1$s este blocat prin controlul parental.</string>
     <string name="live_parental_locked_app">Aplicația a fost închisă de la ultima introducere a PIN-ului.</string>
     <string name="live_parental_locked_ok">Apasă OK pentru a introduce PIN-ul.</string>
+    <string name="live_offset_none">Fără decalaj</string>
+    <string name="live_offset_current">%1$s  ✓ curent</string>
+    <string name="live_offset_current_guide">%1$s  ✓ curent · din ghid</string>
+    <string name="live_offset_from_guide">%1$s (din ghid)</string>
 </resources>

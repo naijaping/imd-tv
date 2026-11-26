@@ -129,4 +129,8 @@
     <string name="live_parental_locked">%1$s är barnlåst av föräldrakontrollen.</string>
     <string name="live_parental_locked_app">Appen har stängts sedan PIN-koden senast angavs.</string>
     <string name="live_parental_locked_ok">Tryck på OK för att ange PIN-koden.</string>
+    <string name="live_offset_none">Ingen förskjutning</string>
+    <string name="live_offset_current">%1$s  ✓ aktuell</string>
+    <string name="live_offset_current_guide">%1$s  ✓ aktuell · från tv-guiden</string>
+    <string name="live_offset_from_guide">%1$s (från tv-guiden)</string>
 </resources>

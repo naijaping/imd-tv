@@ -129,4 +129,8 @@
     <string name="live_parental_locked">Το %1$s είναι κλειδωμένο από τον γονικό έλεγχο.</string>
     <string name="live_parental_locked_app">Η εφαρμογή έχει κλείσει από την τελευταία φορά που εισήχθη το PIN.</string>
     <string name="live_parental_locked_ok">Πατήστε OK για να εισαγάγετε το PIN.</string>
+    <string name="live_offset_none">Χωρίς μετατόπιση</string>
+    <string name="live_offset_current">%1$s  ✓ τρέχουσα</string>
+    <string name="live_offset_current_guide">%1$s  ✓ τρέχουσα · από τον οδηγό</string>
+    <string name="live_offset_from_guide">%1$s (από τον οδηγό)</string>
 </resources>
