@@ -241,7 +241,12 @@ fun GuideGrid(
                             .onPreviewKeyEvent { e ->
                                 if (moving && move != null) return@onPreviewKeyEvent moveKey(e, move, i, state, vm)
                                 if (merging != null && e.key in OK_KEYS) return@onPreviewKeyEvent mergeKey(e, merging, ch, state, vm)
-                                if (state.railOpen) return@onPreviewKeyEvent true // rail is taking focus; don't move the guide behind it
+                                if (state.railOpen) {
+                                    // The rail is taking focus; don't move the guide behind it. Should a row still hold focus
+                                    // under an open rail, Back closes the rail rather than being swallowed with the rest.
+                                    if (e.key == Key.Back && e.type == KeyEventType.KeyUp && !state.railHasFocus) { state.railOpen = false; state.refocus() }
+                                    return@onPreviewKeyEvent true
+                                }
                                 if (vm.numberKey(e, false)) return@onPreviewKeyEvent true
                                 if (e.key == Key.DirectionLeft) return@onPreviewKeyEvent leftKey(e, leftHold, ch, programmes[ch.id].orEmpty(), style.windowMin, vm) { state.focusIndex = i; onLeftAtStart() }
                                 if (e.key == Key.DirectionRight) {

@@ -71,6 +71,7 @@ import org.imdtv.iptvtv.player.resumeAt
 import org.imdtv.iptvtv.ui.ContextMenu
 import org.imdtv.iptvtv.ui.onLongOk
 import org.imdtv.iptvtv.ui.FocusBox
+import org.imdtv.iptvtv.ui.keepsFocus
 import org.imdtv.iptvtv.ui.duration
 import org.imdtv.iptvtv.ui.live.RailCategory
 import org.imdtv.iptvtv.ui.live.SectionRowBox
@@ -377,6 +378,7 @@ private fun VodRail(cats: List<RailCategory>, selectedId: Long?, focus: FocusReq
     val railKeys = org.imdtv.iptvtv.ui.live.rememberRailKeys(state, keys, starts)
     Column(
         Modifier.fillMaxHeight().width(260.dp).shadow(30.dp).background(Color(0xF515171D)).padding(horizontal = 20.dp, vertical = 35.dp)
+            .keepsFocus() // as the Live panel: Up on the first row doesn't reach the top menu with the panel open
             .onPreviewKeyEvent { e -> if (railKeys.onKey(e)) true else if (e.type == KeyEventType.KeyDown && (e.key == Key.Back || e.key == Key.DirectionLeft && e.nativeKeyEvent.repeatCount == 0)) { onClose(); true } else false },
     ) {
         Text(stringResource(R.string.vod_categories_header), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = LocalTheme.current.colors.muted, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 12.dp))

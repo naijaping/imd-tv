@@ -188,9 +188,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val selectTab = { t: Tab ->
-                    if (t == Tab.MOVIES) vod.setKind(Kind.MOVIE)
-                    if (t == Tab.SERIES) vod.setKind(Kind.SERIES)
-                    app.selectTab(t)
+                    // The tab already showing: no side effects (the Movies/Series grid isn't reset either).
+                    if (!org.imdtv.iptvtv.ui.tabShowing(t, app.tab.value, app.stack.value)) {
+                        if (t == Tab.MOVIES) vod.setKind(Kind.MOVIE)
+                        if (t == Tab.SERIES) vod.setKind(Kind.SERIES)
+                        app.selectTab(t)
+                    }
                 }
                 // Dim top menu: the unselected items' opacity while focus is elsewhere.
                 val idle = if (settings.dimTopMenu) settings.menuDim.alpha else 1f

@@ -53,6 +53,7 @@ import org.imdtv.iptvtv.ui.onLongOk
 import org.imdtv.iptvtv.data.repo.RailEntry
 import org.imdtv.iptvtv.data.repo.RailItem
 import org.imdtv.iptvtv.ui.FocusBox
+import org.imdtv.iptvtv.ui.keepsFocus
 
 /** Rail move mode (spec §4.3): Up/Down moves, OK drops, Back puts it back. [entry] is a provider or your category. */
 internal class RailMove(val entry: RailEntry, val from: Int)
@@ -95,6 +96,7 @@ internal fun Rail(
                 else Modifier.shadow(30.dp).background(LocalTheme.current.colors.panel))
             .padding(horizontal = 20.dp, vertical = 35.dp)
             .onFocusChanged { onFocus(it.hasFocus) }
+            .keepsFocus() // Up on the first category / Down on the last stay put (no wrap, as the guide's rows)
             .onPreviewKeyEvent { e ->
                 val down = e.type == KeyEventType.KeyDown
                 if (move != null) {
@@ -155,6 +157,9 @@ internal fun Rail(
     }
 }
 
+/** Focus left the category panel while it's [open], not for one of its menus or a move: close it. */
+internal fun railLeftUnexpectedly(open: Boolean, menuOpen: Boolean, moving: Boolean) = open && !menuOpen && !moving
+
 /** How long the highlight rests on a category before the guide shows it (spec: ~250–300ms). */
 internal const val CATEGORY_PREVIEW_MS = 275L
 
@@ -193,6 +198,14 @@ fun CategoryRail(vm: LiveViewModel, state: GuideState, modifier: Modifier = Modi
         kotlinx.coroutines.delay(CATEGORY_PREVIEW_MS)
         vm.select(h)
     }
+    // Whether focus has reached the panel since it opened (it is composed only while open).
+    val hadFocus = remember { BooleanArray(1) }
+    // Back / Left: the category showing when the panel opened, focus back on the grid.
+    fun close() {
+        highlighted = null
+        opened?.takeIf { it.key != vm.entry.value?.key }?.let(vm::select)
+        state.railOpen = false; state.refocus()
+    }
     // OK / Right: keep this category and go into the grid on its first channel.
     fun pick(e: RailEntry) {
         highlighted = null
@@ -211,13 +224,17 @@ fun CategoryRail(vm: LiveViewModel, state: GuideState, modifier: Modifier = Modi
             onLongPress = { e -> railMenu(e)?.let { state.menu = it } },
             onMove = { d -> state.railMove?.let { vm.moveRail(it.entry, d) } },
             onMoveEnd = { cancel -> endRailMove(vm, state, rail.orEmpty(), cancel) },
-            onClose = {
-                highlighted = null
-                opened?.takeIf { it.key != vm.entry.value?.key }?.let(vm::select)
-                state.railOpen = false; state.refocus()
-            },
+            onClose = { close() },
             onHighlight = { highlighted = it },
-            onFocus = { state.railHasFocus = it },
+            onFocus = { has ->
+                // Safety net: should focus ever leave the open panel some other way (nothing but its own keys and its
+                // menus may take it), close it as Back does. Left open, the grid behind it swallowed every key, Back too.
+                // Lost = this opening of the panel had focus (state.railHasFocus may be stale from the last one).
+                val lost = hadFocus[0] && !has
+                hadFocus[0] = hadFocus[0] || has
+                state.railHasFocus = has
+                if (lost && railLeftUnexpectedly(state.railOpen, state.menu != null, state.railMove != null)) close()
+            },
             others = others, expanded = expanded, onToggle = { id -> vm.expandedPlaylists.value = vm.expandedPlaylists.value.toggled(id) },
             onPickOther = { cat -> vm.usePlaylistAt(cat.providerId, cat.id); state.railOpen = false })
     }

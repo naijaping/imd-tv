@@ -61,6 +61,14 @@ enum class Tab(val label: String, @androidx.annotation.DrawableRes val icon: Int
 /** The main menu's entries: Recordings only while recording is switched on. */
 fun visibleTabs(recordingOn: Boolean): List<Tab> = Tab.entries.filter { it != Tab.RECORDINGS || recordingOn }
 
+/**
+ * A panel the D-pad can't leave by moving (a category panel): Up on its first row, Down on its last and Left/Right past
+ * its edges do nothing. It's left only the way it's designed to be (its own keys: pick, close). Without this, Up on the
+ * first category moved focus into the top menu with the panel still open.
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+fun Modifier.keepsFocus(): Modifier = focusProperties { exit = { FocusRequester.Cancel } }.focusGroup()
+
 /** A D-pad focusable, OK-clickable box that tells its content whether it has focus. */
 @Composable
 fun FocusBox(

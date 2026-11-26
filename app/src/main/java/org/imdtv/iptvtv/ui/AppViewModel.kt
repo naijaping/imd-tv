@@ -53,6 +53,12 @@ fun rootBack(top: Screen, menuFocused: Boolean, hintShowing: Boolean, confirmExi
     else -> RootBack.EXIT
 }
 
+/** The screen a top menu tab opens. */
+fun tabRoot(t: Tab): Screen = when (t) { Tab.LIVE -> Screen.Live; Tab.SEARCH -> Screen.Search; Tab.RECORDINGS -> Screen.Recordings; else -> Screen.Vod }
+
+/** [t] is the tab showing, at its own screen with nothing over it: selecting it again changes nothing. */
+fun tabShowing(t: Tab, current: Tab, stack: List<Screen>): Boolean = t != Tab.SETTINGS && t == current && stack == listOf(tabRoot(t))
+
 /** The screens at launch; the Player's title is filled in once the channel has loaded. */
 fun startStack(hasProvider: Boolean, s: AppSettings, lastChannelExists: Boolean): List<Screen> = when {
     !hasProvider -> listOf(Screen.Setup())
@@ -113,9 +119,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectTab(t: Tab) {
         if (t == Tab.SETTINGS) { push(Screen.Settings()); return }
+        // OK on the tab already showing (Live while on Live): nothing at all, no reload, no stopping the preview.
+        if (tabShowing(t, tab.value, stack.value)) return
         if (t != Tab.LIVE) player.stop() // the live preview shouldn't keep playing behind Movies/Series
         tab.value = t
-        stack.value = listOf(when (t) { Tab.LIVE -> Screen.Live; Tab.SEARCH -> Screen.Search; Tab.RECORDINGS -> Screen.Recordings; else -> Screen.Vod })
+        stack.value = listOf(tabRoot(t))
     }
 
     fun addPlaylist() { form.value = FormState(); push(Screen.Setup()) }
