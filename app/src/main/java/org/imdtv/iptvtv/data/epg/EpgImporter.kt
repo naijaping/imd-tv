@@ -92,6 +92,10 @@ class EpgImporter(
                 },
             )
             if (batch.isNotEmpty()) { sink(ArrayList(batch)); stored += batch.size }
+            // What the last download had before this one's first programme per channel (already aired, and often missing
+            // from a download that starts at "now"): kept, so a +offset channel isn't left empty after each update.
+            runCatching { db.programmeDao().carryEarlierBlocking(source.id, shown, gen, from) }
+                .onFailure { Log.w(TAG, "Keeping earlier programmes failed", it) }
             db.runInTransaction {
                 db.epgDao().deleteChannelsBlocking(source.id)
                 channels.chunked(batchSize).forEach { db.epgDao().insertChannelsBlocking(it) }

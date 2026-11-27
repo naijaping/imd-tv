@@ -355,6 +355,21 @@ abstract class ProgrammeDao {
     )
     abstract suspend fun search(keys: List<String>, now: Long, pattern: String, limit: Int): List<ProgrammeEntity>
 
+    /**
+     * Guide downloads that start at "now" (many providers' do) hold nothing already aired, so a fresh download used to
+     * drop it: a channel shown at +2 h then had nothing on for 2 h after each update. This copies into [newGen] the rows
+     * of [oldGen] that end by the new download's first programme for their channel (and no earlier than [from]): the new
+     * download wins wherever it has programmes, the old one only fills in what came before them.
+     */
+    @Query(
+        """INSERT INTO programme (sourceId, epgChannelKey, start, stop, title, "desc", episodeNum, icon, gen, ageRating)
+           SELECT o.sourceId, o.epgChannelKey, o.start, o.stop, o.title, o."desc", o.episodeNum, o.icon, :newGen, o.ageRating
+           FROM programme o JOIN (SELECT epgChannelKey AS k, MIN(start) AS first FROM programme
+                                  WHERE sourceId = :sourceId AND gen = :newGen GROUP BY epgChannelKey) n ON n.k = o.epgChannelKey
+           WHERE o.sourceId = :sourceId AND o.gen = :oldGen AND o.stop >= :from AND o.stop <= n.first"""
+    )
+    abstract fun carryEarlierBlocking(sourceId: Long, oldGen: Int, newGen: Int, from: Long)
+
     @Insert abstract suspend fun insertAll(list: List<ProgrammeEntity>)
     /** For use inside [androidx.room.RoomDatabase.runInTransaction] on a background thread. */
     @Insert abstract fun insertAllBlocking(list: List<ProgrammeEntity>)

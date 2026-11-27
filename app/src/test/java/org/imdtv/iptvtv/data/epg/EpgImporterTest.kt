@@ -192,4 +192,35 @@ class EpgImporterTest {
         importer().import(source("/m.xml"), daysToKeep = 1, pastDays = 0)
         assertEquals(1, db.programmeDao().count())
     }
+
+    /**
+     * The +2 h bug on the TV: the provider's guide starts at the moment it's downloaded. Downloaded at 13:00 it has
+     * 13:00 onwards; downloaded again at 15:00 it has 15:00 onwards only, so AIT at +2 h had nothing between 15:00 and
+     * 17:00. The new download now keeps the last one's earlier programmes, and its own win wherever they overlap.
+     */
+    @Test
+    fun aDownloadStartingAtNowKeepsTheLastOnesEarlierProgrammes() = runTest {
+        val half = 30 * 60_000L
+        val h = 3_600_000L
+        server.enqueue(MockResponse().setBody(generated(12, now - 2 * h, half)))  // the 13:00 download: P0… from 13:00
+        val src = source("/g.xml")
+        importer().import(src, daysToKeep = 1, pastDays = 1)
+        // The 15:00 download: from 15:00 only, retitled (a changed schedule wins over the old one).
+        server.enqueue(MockResponse().setBody(generated(8, now, half).replace(">P", ">New")))
+        importer().import(src, daysToKeep = 1, pastDays = 1)
+        val rows = db.programmeDao().window(listOf(ProgrammeEntity.key(src.id, "c")), 0, Long.MAX_VALUE)
+        assertEquals(listOf("P0", "P1", "P2", "P3") + (0 until 8).map { "New$it" }, rows.map { it.title })
+        rows.zipWithNext().forEach { (a, b) -> assertEquals(a.stop, b.start) } // no overlaps, no holes
+        // A +2 h channel at 15:22 has the programme from 13:00 on the guide's clock.
+        val p = src.providerId
+        db.channelDao().upsert(listOf(org.imdtv.iptvtv.data.db.ChannelEntity(providerId = p, categoryId = null, remoteId = "ait", name = "AIT",
+            logo = null, number = 912, tvgId = null, streamUrl = "http://h/ait", epgOffsetMinutes = 120)))
+        val ait = db.channelDao().byProvider(p).single()
+        db.epgDao().upsertLinks(listOf(org.imdtv.iptvtv.data.db.EpgLinkEntity(ait.id, src.id, "c", manual = false)))
+        val shown = now + 22 * 60_000L
+        val list = org.imdtv.iptvtv.data.repo.GuideRepository(db).programmes(p, listOf(ait), shown, shown + 2 * h)[ait.id].orEmpty()
+        assertEquals("P0", list.first { it.start <= shown && shown < it.stop }.title)
+        // Only the current generation is left in the table.
+        assertEquals(rows.size, db.programmeDao().count())
+    }
 }
