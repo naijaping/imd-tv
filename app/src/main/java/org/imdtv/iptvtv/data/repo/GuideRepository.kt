@@ -25,13 +25,22 @@ class GuideRepository(private val db: AppDatabase) {
         val byKey = offsets.values.map { it.first }.distinct().chunked(SQL_CHUNK)
             .flatMap { db.programmeDao().window(it, from - slack, to + slack) }
             .groupBy { it.epgChannelKey }
-        return offsets.mapValues { (_, ko) ->
-            val (key, off) = ko
-            byKey[key].orEmpty().map { GuideProgramme(it.title, it.desc, it.episodeNum, it.start + off, it.stop + off, it.ageRating, it.icon?.takeIf { i -> i.isNotBlank() }) }
-                .filter { it.stop > from && it.start < to }
-                .sortedBy { it.start }
-        }
+        return offsets.mapValues { (_, ko) -> onChannelClock(byKey[ko.first].orEmpty(), ko.second, from, to) }
     }
 
-    private companion object { const val MIN = 60_000L }
+    companion object {
+        /**
+         * The one place a guide time offset is applied: each programme's start AND stop moved by [offsetMs] (positive and
+         * negative alike), then kept if it overlaps [from, to) on the channel's clock, in start order. Rows must have been
+         * fetched with the window widened by the offset (see [programmes]).
+         */
+        fun onChannelClock(rows: List<ProgrammeEntity>, offsetMs: Long, from: Long, to: Long): List<GuideProgramme> =
+            rows.map { it.shifted(offsetMs) }.filter { it.stop > from && it.start < to }.sortedBy { it.start }
+    }
+
+    private val MIN = 60_000L
 }
+
+/** This programme on a channel's clock: start and stop both moved by [offsetMs]. */
+fun ProgrammeEntity.shifted(offsetMs: Long) =
+    GuideProgramme(title, desc, episodeNum, start + offsetMs, stop + offsetMs, ageRating, icon?.takeIf { it.isNotBlank() })

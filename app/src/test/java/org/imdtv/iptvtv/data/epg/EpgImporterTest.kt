@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -151,5 +152,44 @@ class EpgImporterTest {
     fun logUrlDropsCredentials() {
         assertEquals("http://h:8080/xmltv.php", EpgImporter.logUrl("http://h:8080/xmltv.php?username=alice&password=s3cret"))
         assertEquals("http://e/guide.xml.gz", EpgImporter.logUrl("http://e/guide.xml.gz"))
+    }
+
+    /**
+     * The +2 h bug: a guide (half-hour programmes, the provider's 6 h back to 12 h ahead) imported with Past days = 0,
+     * shown 40 minutes later on a channel at +2 h. The programme on now aired 2 h earlier on the guide's clock; it was
+     * dropped at import (it had ended before the import), so the row was empty up to the import time + 2 h.
+     */
+    @Test
+    fun positiveOffsetStillHasTheProgrammeOnNow() = runTest {
+        val half = 30 * 60_000L
+        server.enqueue(MockResponse().setBody(generated(36, now - 6 * 3_600_000L, half)))
+        val src = source("/g.xml")
+        importer().import(src, daysToKeep = 1, pastDays = 0)
+        val p = src.providerId
+        for (offset in listOf(120, 60, 30, 0, -60, -120)) {
+            db.channelDao().upsert(listOf(org.imdtv.iptvtv.data.db.ChannelEntity(providerId = p, categoryId = null, remoteId = "ait$offset", name = "AIT",
+                logo = null, number = 912, tvgId = null, streamUrl = "http://h/ait", epgOffsetMinutes = offset)))
+        }
+        val chans = db.channelDao().byProvider(p)
+        db.epgDao().upsertLinks(chans.map { org.imdtv.iptvtv.data.db.EpgLinkEntity(it.id, src.id, "c", manual = false) })
+        val shown = now + 40 * 60_000L
+        val rows = org.imdtv.iptvtv.data.repo.GuideRepository(db).programmes(p, chans, shown, shown + 150 * 60_000L)
+        for (ch in chans) {
+            val list = rows[ch.id].orEmpty()
+            assertTrue("${ch.epgOffsetMinutes}: nothing on now", list.any { it.start <= shown && shown < it.stop })
+            // No holes and no overlaps across the window.
+            list.zipWithNext().forEach { (a, b) -> assertEquals("${ch.epgOffsetMinutes}: gap/overlap", a.stop, b.start) }
+            assertTrue(list.last().stop >= shown + 150 * 60_000L)
+        }
+    }
+
+    @Test
+    fun keepsTheOffsetMarginAroundTheRetentionWindow() = runTest {
+        val h = 3_600_000L
+        // Ended 11 h before the import (kept: a +12 h channel shows it now) and 13 h before (dropped), with Past days 0.
+        val body = generated(1, now - 12 * h, h).removeSuffix("</tv>") + generated(1, now - 14 * h, h).substringAfter("</channel>")
+        server.enqueue(MockResponse().setBody(body))
+        importer().import(source("/m.xml"), daysToKeep = 1, pastDays = 0)
+        assertEquals(1, db.programmeDao().count())
     }
 }

@@ -37,8 +37,11 @@ class EpgImporter(
     suspend fun import(source: EpgSourceEntity, daysToKeep: Int, pastDays: Int, batchSize: Int = 2000): Int =
         withContext(GuideWork) {
             val t = now()
-            val from = t - pastDays * DAY
-            val to = t + daysToKeep * DAY
+            // Kept on the guide's own clock, before any channel's offset: widened by the largest offset there can be
+            // (±12 h), so a channel shown +2 h still has the programme on now (it aired 2 h earlier in the guide), and
+            // changing an offset never needs a new download. Without it a +offset row was empty up to the import time.
+            val from = t - pastDays * DAY - OFFSET_MARGIN
+            val to = t + daysToKeep * DAY + OFFSET_MARGIN
             // Spool to a temp file first so the DB write lock is never held during network I/O.
             val file = File.createTempFile("epg-${source.id}-", ".xml")
             try {
@@ -108,6 +111,8 @@ class EpgImporter(
         /** Xtream EPG URLs carry the username and password in the query. */
         fun logUrl(url: String) = url.substringBefore('?')
         private const val DAY = 86_400_000L
+        /** The largest guide time offset, a channel's or a source's (−12 h … +12 h). */
+        internal const val OFFSET_MARGIN = 12 * 3_600_000L
 
         /** Gzip is detected by magic bytes, not by URL or headers. */
         internal fun maybeGunzip(input: InputStream): InputStream {
